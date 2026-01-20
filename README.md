@@ -16,7 +16,7 @@ Objective: Identify "Shadow FCF" winners in the Semi-Cap sector ($LRCX, $KLAC, $
 ## @Architect (Quant & Logic Filter)
 - **Role**: Mathematical Validation & The "Cull."
 - **Logic Filters**:
-  1. **Shadow FCF Calculation**: $Shadow\ FCF = (Cash\ Flow\ from\ Ops + (0.5 \times R\&D)) - Capex$.
+  1. **Shadow FCF Calculation**: $Shadow\ FCF = (Cash\ Flow\ from\ Ops + (0.5 \times RD)) - Capex$.
   2. **The Cull**: Immediately discard any "Value Trap" (Dividend Yield > 5% with FCF Growth < 2%).
   3. **Acceleration Score ($A_s$)**: $A_s = (\Delta FCF / Payout\ Ratio)$. 
 - **Output**: Rank candidates by $A_s$. If any score is in the top 10th percentile of the sector, generate a summary table in `filtered_picks.md` and tag @Trader.
