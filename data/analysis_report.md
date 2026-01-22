@@ -1,6 +1,6 @@
 # Capital Growth Engine - Analysis Report
 
-Generated: 2026-01-22 22:33:22
+Generated: 2026-01-22 22:46:19
 
 ## Scoring Weights
 - Momentum: 30%
@@ -16,7 +16,7 @@ Generated: 2026-01-22 22:33:22
 | Rank | Ticker | Composite | Mom | Val | Grw | Sent | Type | 3M Ret |
 |------|--------|-----------|-----|-----|-----|------|------|--------|
 | 1 | **LLY** | 74 | 95 | 10 | 100 | 80 | MOMENTUM_GROWTH | 34.0% |
-| 2 | **NVDA** | 68 | 52 | 25 | 100 | 95 | CATALYST_PLAY | 2.5% |
+| 2 | **NVDA** | 69 | 52 | 25 | 100 | 100 | CATALYST_PLAY | 2.5% |
 | 3 | **AVGO** | 58 | 45 | 10 | 82 | 100 | SPECULATIVE | -4.2% |
 | 4 | **PLTR** | 56 | 40 | 10 | 100 | 65 | SPECULATIVE | -5.5% |
 | 5 | **ASML** | 49 | 75 | 25 | 22 | 75 | SPECULATIVE | 38.1% |
@@ -33,8 +33,8 @@ Generated: 2026-01-22 22:33:22
 - **Upside Potential**: 2.1%
 
 ### #2 NVDA - CATALYST_PLAY
-- **Composite Score**: 68/100
-- **Breakdown**: Momentum 52 | Value 25 | Growth 100 | Sentiment 95
+- **Composite Score**: 69/100
+- **Breakdown**: Momentum 52 | Value 25 | Growth 100 | Sentiment 100
 - **Price**: $184.84 | P/E: 45.9 | Rev Growth: 62.5%
 - **Upside Potential**: 37.0%
 

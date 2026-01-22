@@ -1,5 +1,11 @@
 # AGENTS.md - Capital Growth Engine
 
+## On Startup / Common Requests
+- **"send daily update"** or **"run scan"** → Run: `python main.py run`
+- **"full scan"** or **"scan all stocks"** → Run: `python main.py run --universe`
+- **"research X"** → Run: `python main.py research "X"`
+- Discord webhook is configured in `.env` file
+
 ## Project Overview
 Multi-factor investment analysis system with 3 AI agents:
 - **Librarian**: Data collection, news sentiment, Discord integration
