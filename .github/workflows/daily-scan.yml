@@ -1,0 +1,34 @@
+name: Daily Investment Scan
+
+on:
+  schedule:
+    # Runs at 12:05 PM CST (18:05 UTC) every day
+    - cron: '5 18 * * *'
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      - name: Run Investment Scan
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python main.py run --universe
+        
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-results-${{ github.run_number }}
+          path: data/
+          retention-days: 30

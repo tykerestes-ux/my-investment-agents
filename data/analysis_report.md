@@ -1,6 +1,6 @@
 # Capital Growth Engine - Analysis Report
 
-Generated: 2026-01-22 01:58:26
+Generated: 2026-01-22 22:33:22
 
 ## Scoring Weights
 - Momentum: 30%
@@ -15,12 +15,12 @@ Generated: 2026-01-22 01:58:26
 
 | Rank | Ticker | Composite | Mom | Val | Grw | Sent | Type | 3M Ret |
 |------|--------|-----------|-----|-----|-----|------|------|--------|
-| 1 | **LLY** | 74 | 95 | 10 | 100 | 80 | MOMENTUM_GROWTH | 35.1% |
-| 2 | **NVDA** | 68 | 52 | 25 | 100 | 90 | CATALYST_PLAY | 1.2% |
-| 3 | **AVGO** | 61 | 53 | 10 | 82 | 100 | BALANCED | -3.9% |
-| 4 | **PLTR** | 57 | 40 | 10 | 100 | 70 | SPECULATIVE | -8.9% |
-| 5 | **ASML** | 51 | 75 | 25 | 22 | 85 | SPECULATIVE | 32.9% |
-| 6 | **COST** | 39 | 27 | 10 | 52 | 75 | SPECULATIVE | 5.0% |
+| 1 | **LLY** | 74 | 95 | 10 | 100 | 80 | MOMENTUM_GROWTH | 34.0% |
+| 2 | **NVDA** | 68 | 52 | 25 | 100 | 95 | CATALYST_PLAY | 2.5% |
+| 3 | **AVGO** | 58 | 45 | 10 | 82 | 100 | SPECULATIVE | -4.2% |
+| 4 | **PLTR** | 56 | 40 | 10 | 100 | 65 | SPECULATIVE | -5.5% |
+| 5 | **ASML** | 49 | 75 | 25 | 22 | 75 | SPECULATIVE | 38.1% |
+| 6 | **COST** | 41 | 27 | 10 | 52 | 85 | SPECULATIVE | 3.5% |
 
 ---
 
@@ -29,20 +29,14 @@ Generated: 2026-01-22 01:58:26
 ### #1 LLY - MOMENTUM_GROWTH
 - **Composite Score**: 74/100
 - **Breakdown**: Momentum 95 | Value 10 | Growth 100 | Sentiment 80
-- **Price**: $1078.52 | P/E: 52.8 | Rev Growth: 53.9%
-- **Upside Potential**: 3.0%
+- **Price**: $1087.38 | P/E: 53.4 | Rev Growth: 53.9%
+- **Upside Potential**: 2.1%
 
 ### #2 NVDA - CATALYST_PLAY
 - **Composite Score**: 68/100
-- **Breakdown**: Momentum 52 | Value 25 | Growth 100 | Sentiment 90
-- **Price**: $183.32 | P/E: 45.4 | Rev Growth: 62.5%
-- **Upside Potential**: 38.1%
-
-### #3 AVGO - BALANCED
-- **Composite Score**: 61/100
-- **Breakdown**: Momentum 53 | Value 10 | Growth 82 | Sentiment 100
-- **Price**: $328.80 | P/E: 69.1 | Rev Growth: 16.4%
-- **Upside Potential**: 38.6%
+- **Breakdown**: Momentum 52 | Value 25 | Growth 100 | Sentiment 95
+- **Price**: $184.84 | P/E: 45.9 | Rev Growth: 62.5%
+- **Upside Potential**: 37.0%
 
 
 ---
