@@ -208,7 +208,7 @@ class Librarian:
     def send_discord_message(self, message: str, embeds: list = None):
         """Send message to Discord webhook."""
         if not self.webhook_url:
-            print("Discord webhook not configured")
+            print("⚠️  Discord webhook not configured - set DISCORD_WEBHOOK_URL in .env")
             return False
         
         payload = {"content": message}
@@ -216,11 +216,45 @@ class Librarian:
             payload["embeds"] = embeds
         
         try:
-            response = requests.post(self.webhook_url, json=payload)
-            return response.status_code == 204
+            response = requests.post(self.webhook_url, json=payload, timeout=10)
+            if response.status_code == 204:
+                print("✅ Discord notification sent successfully")
+                return True
+            else:
+                print(f"⚠️  Discord error: {response.status_code} - {response.text}")
+                return False
         except Exception as e:
-            print(f"Discord send error: {e}")
+            print(f"⚠️  Discord send error: {e}")
             return False
+    
+    def send_detailed_discord_report(self, scored_data: list, top_picks: list):
+        """Send a rich Discord report with all top picks."""
+        if not self.webhook_url:
+            print("⚠️  Discord webhook not configured")
+            return False
+        
+        # Main summary embed
+        embeds = [{
+            "title": "📊 Capital Growth Engine - Daily Report",
+            "description": f"Scanned {len(scored_data)} stocks | {len(top_picks)} opportunities found",
+            "color": 3066993,
+            "timestamp": datetime.now().isoformat()
+        }]
+        
+        # Add top picks as fields
+        if top_picks:
+            fields = []
+            for pick in top_picks[:5]:
+                score = pick.get('scores', {}).get('composite', 0)
+                emoji = "🟢" if score >= 70 else "🟡" if score >= 60 else "🔴"
+                fields.append({
+                    "name": f"{emoji} {pick['ticker']} - Score: {score:.0f}",
+                    "value": f"Type: {pick.get('opportunity_type', 'N/A')}\nPrice: ${pick.get('price', 0):.2f}",
+                    "inline": True
+                })
+            embeds[0]["fields"] = fields
+        
+        return self.send_discord_message("**🚨 New Investment Scan Complete**", embeds)
     
     def read_discord_messages(self, channel_id: str = None, limit: int = 50) -> list:
         """

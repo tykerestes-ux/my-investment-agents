@@ -35,6 +35,12 @@ def run_full_pipeline(universe_scan: bool = False):
         trader = Trader()
         trader_output = trader.run_audit()
         
+        # Step 4: Send detailed Discord notification
+        print("\n📤 Sending Discord notification...")
+        top_picks = architect_output.get("top_picks", [])
+        all_candidates = architect_output.get("candidates", [])
+        librarian.send_detailed_discord_report(all_candidates, top_picks)
+        
         print(f"\n{'='*70}")
         print(f"        Pipeline Complete: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*70}\n")
