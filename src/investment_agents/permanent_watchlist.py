@@ -27,13 +27,56 @@ class PermanentWatchlistMonitor:
         self.auditor = RiskAuditor()
         self.symbols = list(PERMANENT_WATCHLIST)
 
-    def schedule_friday_audits(self) -> None:
-        trigger = CronTrigger(day_of_week=4, hour=15, minute=0, timezone=self.scheduler.timezone)
+    def schedule_all_auto_audits(self) -> None:
+        """Schedule all automatic audits."""
+        tz = self.scheduler.timezone
+
+        # 1. Friday afternoon audit (before weekend)
         self.scheduler.scheduler.add_job(
-            self._run_scheduled_audit, trigger=trigger,
-            id="friday_risk_audit", replace_existing=True,
+            self._run_scheduled_audit,
+            CronTrigger(day_of_week=4, hour=15, minute=0, timezone=tz),
+            id="friday_risk_audit",
+            replace_existing=True,
+            args=["Weekly Friday Risk Audit"],
         )
-        logger.info("Friday 3:00 PM risk audits scheduled")
+        logger.info("Scheduled: Friday 3:00 PM risk audit")
+
+        # 2. Market open audit (9:35 AM, 5 min after open to let prices settle)
+        self.scheduler.scheduler.add_job(
+            self._run_scheduled_audit,
+            CronTrigger(day_of_week="mon-fri", hour=9, minute=35, timezone=tz),
+            id="market_open_audit",
+            replace_existing=True,
+            args=["Market Open Audit"],
+        )
+        logger.info("Scheduled: Market open audit (9:35 AM Mon-Fri)")
+
+        # 3. Mid-day check (12:00 PM)
+        self.scheduler.scheduler.add_job(
+            self._run_scheduled_audit,
+            CronTrigger(day_of_week="mon-fri", hour=12, minute=0, timezone=tz),
+            id="midday_audit",
+            replace_existing=True,
+            args=["Mid-Day Check"],
+        )
+        logger.info("Scheduled: Mid-day audit (12:00 PM Mon-Fri)")
+
+        # 4. Pre-close audit (3:30 PM, 30 min before close)
+        self.scheduler.scheduler.add_job(
+            self._run_scheduled_audit,
+            CronTrigger(day_of_week="mon-fri", hour=15, minute=30, timezone=tz),
+            id="preclose_audit",
+            replace_existing=True,
+            args=["Pre-Close Audit"],
+        )
+        logger.info("Scheduled: Pre-close audit (3:30 PM Mon-Fri)")
+
+    def schedule_friday_audits(self) -> None:
+        """Legacy method - now schedules all audits."""
+        self.schedule_all_auto_audits()
+
+    async def _run_scheduled_audit(self, reason: str = "Scheduled Risk Audit") -> None:
+        await self.run_full_audit(reason=reason)
 
     async def _run_scheduled_audit(self) -> None:
         await self.run_full_audit(reason="Weekly Friday Risk Audit")

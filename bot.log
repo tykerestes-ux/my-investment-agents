@@ -1,0 +1,37 @@
+2026-02-01 21:00:16 - investment_agents.config - INFO - Logging configured at INFO level
+2026-02-01 21:00:16 - investment_agents.bot_main - INFO - Starting Investment Agents Bot...
+2026-02-01 21:00:16 - discord.client - WARNING - PyNaCl is not installed, voice will NOT be supported
+2026-02-01 21:00:16 - investment_agents.watchlist - INFO - No existing watchlist found, starting fresh
+2026-02-01 21:00:19 - investment_agents.bot_main - INFO - Bot is ready! Logged in as Investment Bot#1602
+2026-02-01 21:00:19 - investment_agents.commands - INFO - Watchlist commands registered
+2026-02-01 21:00:19 - investment_agents.risk_commands - INFO - Risk audit commands registered
+2026-02-01 21:00:19 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-01 21:00:19 - investment_agents.scheduler - INFO - Scheduled daily update at 09:00 America/New_York
+2026-02-01 21:00:19 - apscheduler.scheduler - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-02-01 21:00:19 - investment_agents.permanent_watchlist - INFO - Friday 3:00 PM risk audits scheduled
+2026-02-01 21:00:19 - apscheduler.scheduler - INFO - Added job "DailyUpdateScheduler._run_async_callback" to job store "default"
+2026-02-01 21:00:19 - apscheduler.scheduler - INFO - Added job "PermanentWatchlistMonitor._run_scheduled_audit" to job store "default"
+2026-02-01 21:00:19 - apscheduler.scheduler - INFO - Scheduler started
+2026-02-01 21:00:19 - investment_agents.scheduler - INFO - Scheduler started
+2026-02-01 21:00:19 - investment_agents.bot_main - INFO - Scheduled: daily_watchlist_update - Next: 2026-02-02 09:00:00-05:00
+2026-02-01 21:00:19 - investment_agents.bot_main - INFO - Scheduled: friday_risk_audit - Next: 2026-02-06 15:00:00-05:00
+2026-02-01 21:39:24 - investment_agents.scheduler - INFO - Scheduler stopped
+2026-02-01 21:39:24 - apscheduler.scheduler - INFO - Scheduler has been shut down
+Traceback (most recent call last):
+  File "/project/workspace/my-investment-agents/run_discord_bot.py", line 10, in <module>
+    main()
+  File "/project/workspace/my-investment-agents/src/investment_agents/bot_main.py", line 94, in main
+    asyncio.run(run_bot())
+  File "/home/codespace/.python/current/lib/python3.10/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/home/codespace/.python/current/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/project/workspace/my-investment-agents/src/investment_agents/bot_main.py", line 84, in run_bot
+    await bot.start(settings.discord_bot_token)
+  File "/project/workspace/my-investment-agents/venv/lib/python3.10/site-packages/discord/client.py", line 847, in start
+    await self.connect(reconnect=reconnect)
+  File "/project/workspace/my-investment-agents/venv/lib/python3.10/site-packages/discord/client.py", line 727, in connect
+    await self.ws.poll_event()
+  File "/project/workspace/my-investment-agents/venv/lib/python3.10/site-packages/discord/gateway.py", line 658, in poll_event
+    raise ConnectionClosed(self.socket, shard_id=self.shard_id, code=code) from None
+discord.errors.ConnectionClosed: Shard ID None WebSocket closed with 4004
