@@ -1,9 +1,10 @@
 """Permanent watchlist with automatic risk audits."""
 
 import asyncio
+import json
 import logging
 from datetime import datetime
-from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -18,9 +19,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_PERMANENT_WATCHLIST = ["LRCX", "KLAC", "ASML", "ONDS"]
+PERMANENT_WATCHLIST_FILE = Path("data/permanent_watchlist.json")
 
-# Global mutable list that can be modified at runtime
-_permanent_symbols: list[str] = list(DEFAULT_PERMANENT_WATCHLIST)
+
+def _load_permanent_symbols() -> list[str]:
+    """Load permanent watchlist from file."""
+    if PERMANENT_WATCHLIST_FILE.exists():
+        try:
+            with open(PERMANENT_WATCHLIST_FILE) as f:
+                data = json.load(f)
+                symbols = data.get("symbols", DEFAULT_PERMANENT_WATCHLIST)
+                logger.info(f"Loaded {len(symbols)} symbols from permanent watchlist")
+                return symbols
+        except Exception as e:
+            logger.error(f"Error loading permanent watchlist: {e}")
+    return list(DEFAULT_PERMANENT_WATCHLIST)
+
+
+def _save_permanent_symbols(symbols: list[str]) -> None:
+    """Save permanent watchlist to file."""
+    try:
+        PERMANENT_WATCHLIST_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(PERMANENT_WATCHLIST_FILE, "w") as f:
+            json.dump({"symbols": symbols}, f, indent=2)
+        logger.info(f"Saved {len(symbols)} symbols to permanent watchlist")
+    except Exception as e:
+        logger.error(f"Error saving permanent watchlist: {e}")
+
+
+# Load from file on startup
+_permanent_symbols: list[str] = _load_permanent_symbols()
 
 
 class PermanentWatchlistMonitor:
@@ -39,6 +67,7 @@ class PermanentWatchlistMonitor:
         symbol = symbol.upper()
         if symbol not in _permanent_symbols:
             _permanent_symbols.append(symbol)
+            _save_permanent_symbols(_permanent_symbols)
             logger.info(f"Added {symbol} to permanent watchlist")
             return True
         return False
@@ -48,6 +77,7 @@ class PermanentWatchlistMonitor:
         symbol = symbol.upper()
         if symbol in _permanent_symbols:
             _permanent_symbols.remove(symbol)
+            _save_permanent_symbols(_permanent_symbols)
             logger.info(f"Removed {symbol} from permanent watchlist")
             return True
         return False
