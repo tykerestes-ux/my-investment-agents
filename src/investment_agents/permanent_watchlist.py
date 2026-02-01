@@ -17,7 +17,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-PERMANENT_WATCHLIST = ["LRCX", "KLAC", "ASML", "ONDS"]
+DEFAULT_PERMANENT_WATCHLIST = ["LRCX", "KLAC", "ASML", "ONDS"]
+
+# Global mutable list that can be modified at runtime
+_permanent_symbols: list[str] = list(DEFAULT_PERMANENT_WATCHLIST)
 
 
 class PermanentWatchlistMonitor:
@@ -26,7 +29,28 @@ class PermanentWatchlistMonitor:
         self.channel_id = channel_id
         self.scheduler = scheduler
         self.auditor = RiskAuditor()
-        self.symbols = list(PERMANENT_WATCHLIST)
+
+    @property
+    def symbols(self) -> list[str]:
+        return _permanent_symbols
+
+    def add_symbol(self, symbol: str) -> bool:
+        """Add a symbol to permanent watchlist."""
+        symbol = symbol.upper()
+        if symbol not in _permanent_symbols:
+            _permanent_symbols.append(symbol)
+            logger.info(f"Added {symbol} to permanent watchlist")
+            return True
+        return False
+
+    def remove_symbol(self, symbol: str) -> bool:
+        """Remove a symbol from permanent watchlist."""
+        symbol = symbol.upper()
+        if symbol in _permanent_symbols:
+            _permanent_symbols.remove(symbol)
+            logger.info(f"Removed {symbol} from permanent watchlist")
+            return True
+        return False
 
     def schedule_all_auto_audits(self) -> None:
         """Schedule all automatic audits."""
@@ -123,4 +147,4 @@ class PermanentWatchlistMonitor:
 
 
 def get_permanent_symbols() -> list[str]:
-    return list(PERMANENT_WATCHLIST)
+    return list(_permanent_symbols)

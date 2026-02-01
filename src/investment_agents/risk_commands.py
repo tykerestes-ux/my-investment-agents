@@ -60,6 +60,24 @@ class RiskCommands(commands.Cog):
         symbols = get_permanent_symbols()
         await ctx.send(f"📌 **Permanent Watchlist:** {', '.join(symbols)}")
 
+    @commands.command(name="permadd", aliases=["padd"])
+    async def add_permanent(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Add a symbol to permanent watchlist. Usage: !permadd NVDA"""
+        symbol = symbol.upper()
+        if self.monitor.add_symbol(symbol):
+            await ctx.send(f"✅ Added **{symbol}** to permanent watchlist")
+        else:
+            await ctx.send(f"⚠️ **{symbol}** is already in permanent watchlist")
+
+    @commands.command(name="permremove", aliases=["prm"])
+    async def remove_permanent(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Remove a symbol from permanent watchlist. Usage: !permremove NVDA"""
+        symbol = symbol.upper()
+        if self.monitor.remove_symbol(symbol):
+            await ctx.send(f"✅ Removed **{symbol}** from permanent watchlist")
+        else:
+            await ctx.send(f"❌ **{symbol}** not found in permanent watchlist")
+
     @commands.command(name="vwap")
     async def vwap_check(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
         symbol = symbol.upper()
@@ -90,7 +108,11 @@ class RiskCommands(commands.Cog):
 `!catalyst SYMBOL reason` - Pre-catalyst audit
 `!hype SYMBOL` - Quick hype score
 `!vwap SYMBOL` - VWAP check
+
+**📌 Permanent Watchlist:**
 `!permanent` - Show permanent watchlist
+`!permadd SYMBOL` - Add to permanent watchlist
+`!permremove SYMBOL` - Remove from permanent watchlist
 
 **Shield Filters:** VWAP, Sell-the-News, Dilution, Volume, 10:30 AM Rule
 """
