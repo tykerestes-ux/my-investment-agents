@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
+from .entry_signals import EntrySignalAnalyzer, EntrySignal
 from .permanent_watchlist import PermanentWatchlistMonitor, get_permanent_symbols
 from .risk_audit import RiskAuditor
 
@@ -19,6 +20,7 @@ class RiskCommands(commands.Cog):
         self.bot = bot
         self.monitor = monitor
         self.auditor = RiskAuditor()
+        self.entry_analyzer = EntrySignalAnalyzer()
 
     @commands.command(name="audit", aliases=["risk", "check"])
     async def audit_symbol(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
@@ -99,10 +101,56 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
-    @commands.command(name="helpaudit", aliases=["riskhelp"])
+    @commands.command(name="entry", aliases=["signal", "buy"])
+    async def entry_signal(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check if now is a good time to enter. Usage: !entry KLAC"""
+        symbol = symbol.upper()
+        await ctx.send(f"🎯 Analyzing entry for **{symbol}**...")
+        try:
+            analysis = await self.entry_analyzer.analyze_entry(symbol)
+            await ctx.send(analysis.to_discord_message())
+        except Exception as e:
+            logger.error(f"Entry analysis error for {symbol}: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="scan", aliases=["scanall", "entries"])
+    async def scan_entries(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Scan all permanent watchlist for entry opportunities."""
+        await ctx.send("🔍 Scanning watchlist for entry signals...")
+        try:
+            results = await self.entry_analyzer.scan_for_entries()
+            
+            # Show best opportunities first
+            strong = [r for r in results if r.signal == EntrySignal.STRONG_BUY]
+            good = [r for r in results if r.signal == EntrySignal.BUY]
+            
+            if strong:
+                await ctx.send(f"🟢🟢🟢 **STRONG BUY signals:** {len(strong)}")
+                for r in strong:
+                    await ctx.send(r.to_discord_message())
+            
+            if good:
+                await ctx.send(f"🟢 **BUY signals:** {len(good)}")
+                for r in good:
+                    await ctx.send(r.to_discord_message())
+            
+            if not strong and not good:
+                await ctx.send("No actionable entry signals found. All positions: WAIT or NO ENTRY.")
+                # Show summary
+                summary = "\n".join([f"• {r.symbol}: {r.signal.value} ({r.confidence}%)" for r in results])
+                await ctx.send(f"**Summary:**\n{summary}")
+        except Exception as e:
+            logger.error(f"Scan error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="helpaudit", aliases=["riskhelp", "help"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
-**📊 Risk Audit Commands:**
+**🎯 Entry Signals:**
+`!entry SYMBOL` - Check if good time to enter
+`!scan` - Scan watchlist for best entries
+
+**📊 Risk Audit:**
 `!audit SYMBOL` - Full risk audit
 `!auditall` - Audit permanent watchlist
 `!catalyst SYMBOL reason` - Pre-catalyst audit
@@ -110,11 +158,11 @@ class RiskCommands(commands.Cog):
 `!vwap SYMBOL` - VWAP check
 
 **📌 Permanent Watchlist:**
-`!permanent` - Show permanent watchlist
-`!permadd SYMBOL` - Add to permanent watchlist
-`!permremove SYMBOL` - Remove from permanent watchlist
+`!permanent` - Show watchlist
+`!permadd SYMBOL` - Add symbol
+`!permremove SYMBOL` - Remove symbol
 
-**Shield Filters:** VWAP, Sell-the-News, Dilution, Volume, 10:30 AM Rule
+**Conditions for Entry:** VWAP above, Volume confirmed, Not overextended, No dilution, Morning settled, Above support, Positive momentum
 """
         await ctx.send(help_text)
 
