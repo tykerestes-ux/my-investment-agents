@@ -1,0 +1,4 @@
+[console_scripts]
+investment-bot = investment_agents.main:main
+investment-webhook = investment_agents.webhook_runner:main
+watchlist = investment_agents.cli:main

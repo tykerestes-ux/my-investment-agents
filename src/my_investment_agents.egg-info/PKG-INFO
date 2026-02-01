@@ -1,0 +1,121 @@
+Metadata-Version: 2.4
+Name: my-investment-agents
+Version: 0.1.0
+Summary: Investment agents with Discord integration for watchlist tracking and daily updates
+Author: tykerestes-ux
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: discord.py>=2.3.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: aiohttp>=3.9.0
+Requires-Dist: apscheduler>=3.10.0
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: pydantic-settings>=2.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+
+# my-investment-agents
+
+Investment tracking agents with Discord integration for watchlist management and daily updates.
+
+## Features
+
+- **Discord Bot Integration**: Read and write messages to Discord channels
+- **Watchlist Management**: Track symbols with notes, target prices, and alerts
+- **Daily Updates**: Scheduled daily watchlist summaries
+- **Price Alerts**: Set alerts for when prices go above/below thresholds
+
+## Setup
+
+### 1. Create a Discord Bot
+
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Click "New Application" and give it a name
+3. Go to "Bot" section and click "Add Bot"
+4. Enable these Privileged Gateway Intents:
+   - Message Content Intent
+   - Server Members Intent (optional)
+5. Copy the bot token
+
+### 2. Invite Bot to Your Server
+
+1. Go to OAuth2 > URL Generator
+2. Select scopes: `bot`, `applications.commands`
+3. Select permissions: `Send Messages`, `Read Message History`, `Add Reactions`, `Embed Links`
+4. Copy the generated URL and open it to invite the bot
+
+### 3. Get Channel ID
+
+1. Enable Developer Mode in Discord (Settings > Advanced > Developer Mode)
+2. Right-click the channel you want to use and click "Copy ID"
+
+### 4. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your bot token and channel ID
+```
+
+### 5. Install and Run
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -e .
+
+# Run the bot
+investment-bot
+```
+
+## Discord Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `!watchlist` | Show current watchlist | `!watchlist` |
+| `!add <symbol> [notes]` | Add symbol to watchlist | `!add AAPL Great fundamentals` |
+| `!remove <symbol>` | Remove symbol | `!remove AAPL` |
+| `!target <symbol> <price>` | Set target price | `!target AAPL 200.00` |
+| `!alert <symbol> above/below <price>` | Set price alert | `!alert AAPL above 200` |
+| `!info <symbol>` | Show symbol details | `!info AAPL` |
+| `!notes <symbol> <text>` | Update notes | `!notes AAPL New thesis` |
+| `!import <symbols>` | Import multiple symbols | `!import AAPL, GOOGL, MSFT` |
+| `!export` | Export all symbols | `!export` |
+| `!clear` | Clear entire watchlist | `!clear` |
+
+**Quick Add**: Type `$SYMBOL` to quickly add a symbol (e.g., `$TSLA`)
+
+## Configuration
+
+Environment variables (`.env`):
+
+```
+DISCORD_BOT_TOKEN=your_bot_token
+DISCORD_CHANNEL_ID=your_channel_id
+DAILY_UPDATE_TIME=09:00
+TIMEZONE=America/New_York
+LOG_LEVEL=INFO
+```
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run linter
+ruff check src/
+
+# Run type checker
+mypy src/
+```
