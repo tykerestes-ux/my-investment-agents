@@ -143,7 +143,7 @@ class RiskCommands(commands.Cog):
             logger.error(f"Scan error: {e}")
             await ctx.send(f"❌ Error: {str(e)[:200]}")
 
-    @commands.command(name="helpaudit", aliases=["riskhelp", "help"])
+    @commands.command(name="helpaudit", aliases=["riskhelp", "commands"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
 **🎯 Entry Signals:**
