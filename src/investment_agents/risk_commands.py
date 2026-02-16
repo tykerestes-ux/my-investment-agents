@@ -5,10 +5,17 @@ from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
+from .backtest import run_quick_backtest, Backtester
+from .earnings_calendar import get_earnings_date, format_earnings_discord
+from .enhanced_analyzer import EnhancedEntryAnalyzer, enhanced_analyze
 from .entry_signals import EntrySignalAnalyzer, EntrySignal
+from .multi_timeframe import get_multi_timeframe_data, format_multi_timeframe_discord
+from .news_sentiment import analyze_news_sentiment, format_news_discord
 from .permanent_watchlist import PermanentWatchlistMonitor, get_permanent_symbols
+from .position_sizing import calculate_position_size, format_position_size_discord
 from .prediction_journal import get_journal, PredictionType, Outcome
 from .risk_audit import RiskAuditor
+from .sector_correlation import analyze_sector_correlation, get_sector_summary, format_sector_discord
 
 if TYPE_CHECKING:
     from .discord_client import InvestmentBot
@@ -22,6 +29,8 @@ class RiskCommands(commands.Cog):
         self.monitor = monitor
         self.auditor = RiskAuditor()
         self.entry_analyzer = EntrySignalAnalyzer()
+        self.enhanced_analyzer = EnhancedEntryAnalyzer()
+        self.enhanced_analyzer = EnhancedEntryAnalyzer()
 
     @commands.command(name="audit", aliases=["risk", "check"])
     async def audit_symbol(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
@@ -214,35 +223,154 @@ class RiskCommands(commands.Cog):
         else:
             await ctx.send(f"❌ Prediction {pred_id} not found")
 
+    # === ENHANCED ANALYSIS COMMANDS ===
+
+    @commands.command(name="deep", aliases=["enhanced", "full"])
+    async def deep_analysis(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Run enhanced analysis with all 6 filters. Usage: !deep KLAC"""
+        symbol = symbol.upper()
+        await ctx.send(f"🔬 Running enhanced analysis for **{symbol}**... (this may take a moment)")
+        try:
+            analysis = await self.enhanced_analyzer.analyze(symbol, run_backtest=True)
+            await ctx.send(analysis.to_discord_message())
+        except Exception as e:
+            logger.error(f"Enhanced analysis error for {symbol}: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="earnings", aliases=["earn"])
+    async def check_earnings(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check earnings date and lockout status. Usage: !earnings KLAC"""
+        symbol = symbol.upper()
+        try:
+            info = get_earnings_date(symbol)
+            await ctx.send(format_earnings_discord(info))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="sector", aliases=["correlation"])
+    async def check_sector(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check sector correlation and crowding. Usage: !sector KLAC"""
+        symbol = symbol.upper()
+        try:
+            # Get all current signals for context
+            all_signals = {}
+            for sym in get_permanent_symbols():
+                analysis = await self.entry_analyzer.analyze_entry(sym)
+                all_signals[sym] = analysis.signal.value
+            
+            sector_analysis = analyze_sector_correlation(symbol, all_signals)
+            await ctx.send(format_sector_discord(sector_analysis))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="timeframe", aliases=["tf", "mtf"])
+    async def check_timeframes(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check multi-timeframe alignment. Usage: !timeframe KLAC"""
+        symbol = symbol.upper()
+        try:
+            data = get_multi_timeframe_data(symbol)
+            await ctx.send(format_multi_timeframe_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="news", aliases=["sentiment"])
+    async def check_news(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check news sentiment. Usage: !news KLAC"""
+        symbol = symbol.upper()
+        try:
+            analysis = analyze_news_sentiment(symbol)
+            await ctx.send(format_news_discord(analysis))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="backtest", aliases=["bt"])
+    async def run_backtest(self, ctx: commands.Context[commands.Bot], symbol: str, days: int = 90) -> None:
+        """Run backtest on historical data. Usage: !backtest KLAC 90"""
+        symbol = symbol.upper()
+        await ctx.send(f"📊 Running {days}-day backtest for **{symbol}**...")
+        try:
+            result = run_quick_backtest(symbol, days)
+            await ctx.send(result.to_discord_message())
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="size", aliases=["position", "possize"])
+    async def calculate_size(
+        self,
+        ctx: commands.Context[commands.Bot],
+        symbol: str,
+        account: float = 10000,
+    ) -> None:
+        """Calculate position size. Usage: !size KLAC 10000"""
+        symbol = symbol.upper()
+        try:
+            # Get current signal for the symbol
+            analysis = await self.entry_analyzer.analyze_entry(symbol)
+            
+            sizing = calculate_position_size(
+                symbol=symbol,
+                confidence=analysis.confidence,
+                signal_type=analysis.signal.value.upper(),
+                account_size=account,
+            )
+            await ctx.send(format_position_size_discord(sizing, account))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="deepscan", aliases=["fullscan"])
+    async def deep_scan(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Run enhanced analysis on entire watchlist."""
+        await ctx.send("🔬 Running enhanced scan on watchlist... (this may take a minute)")
+        try:
+            results = await self.enhanced_analyzer.scan_enhanced(run_backtest=False)
+            
+            # Categorize results
+            strong = [r for r in results if r.final_signal == EntrySignal.STRONG_BUY]
+            buy = [r for r in results if r.final_signal == EntrySignal.BUY]
+            wait = [r for r in results if r.final_signal == EntrySignal.WAIT]
+            
+            summary = (
+                f"**Enhanced Scan Complete**\n"
+                f"🟢🟢🟢 Strong Buy: {len(strong)}\n"
+                f"🟢 Buy: {len(buy)}\n"
+                f"🟡 Wait: {len(wait)}\n"
+            )
+            await ctx.send(summary)
+            
+            # Show details for actionable signals
+            for r in strong + buy[:3]:
+                await ctx.send(r.to_discord_message())
+                
+        except Exception as e:
+            logger.error(f"Deep scan error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
     @commands.command(name="helpaudit", aliases=["riskhelp", "commands"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
-**🎯 Entry Signals:**
-`!entry SYMBOL` - Check if good time to enter
-`!scan` - Scan watchlist for best entries
+**🔬 Enhanced Analysis (NEW):**
+`!deep SYMBOL` - Full analysis with all 6 filters
+`!deepscan` - Enhanced scan of watchlist
 
-**📊 Risk Audit:**
-`!audit SYMBOL` - Full risk audit
-`!auditall` - Audit permanent watchlist
-`!hype SYMBOL` - Quick hype score
-`!vwap SYMBOL` - VWAP check
+**🎯 Entry Signals:**
+`!entry SYMBOL` - Quick entry check
+`!scan` - Scan watchlist for entries
+
+**📊 Advanced Filters:**
+`!earnings SYMBOL` - Earnings calendar check
+`!sector SYMBOL` - Sector correlation/crowding
+`!timeframe SYMBOL` - Multi-timeframe alignment
+`!news SYMBOL` - News sentiment analysis
+`!backtest SYMBOL [days]` - Historical backtest
+`!size SYMBOL [account]` - Position sizing
 
 **📔 Prediction Journal:**
-`!journal [days]` - Show prediction stats
-`!predictions [limit]` - Show recent predictions
+`!journal [days]` - Prediction stats
 `!variance` - Run variance analysis
-`!outcome ID result price` - Update prediction outcome
 
-**📌 Permanent Watchlist:**
+**📌 Watchlist:**
 `!permanent` - Show watchlist
-`!permadd SYMBOL` - Add symbol
-`!permremove SYMBOL` - Remove symbol
-
-**⏰ Scheduled Tasks (Auto):**
-• 4:00 AM - Pre-Market Digestion
-• 10:00 AM - VWAP Integrity Scan
-• 2:00 PM - 2 O'Clock Sweep
-• 8:00 PM - Recursive Audit
+`!permadd/permremove SYMBOL` - Manage watchlist
 """
         await ctx.send(help_text)
 
