@@ -7,6 +7,7 @@ from discord.ext import commands
 
 from .entry_signals import EntrySignalAnalyzer, EntrySignal
 from .permanent_watchlist import PermanentWatchlistMonitor, get_permanent_symbols
+from .prediction_journal import get_journal, PredictionType, Outcome
 from .risk_audit import RiskAuditor
 
 if TYPE_CHECKING:
@@ -143,6 +144,76 @@ class RiskCommands(commands.Cog):
             logger.error(f"Scan error: {e}")
             await ctx.send(f"❌ Error: {str(e)[:200]}")
 
+    @commands.command(name="journal", aliases=["j"])
+    async def show_journal(self, ctx: commands.Context[commands.Bot], days: int = 7) -> None:
+        """Show prediction journal stats. Usage: !journal or !journal 30"""
+        journal = get_journal()
+        stats = journal.get_stats(days=days)
+
+        msg = (
+            f"📔 **Prediction Journal** (Last {days} days)\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"**Total Predictions:** {stats['total_predictions']}\n"
+            f"**Resolved:** {stats['resolved']} | **Pending:** {stats['pending']}\n"
+            f"**Accuracy:** {stats['accuracy']:.1f}%\n"
+            f"**Total P&L:** {stats['total_pnl_percent']:+.1f}%\n"
+            f"**Avg P&L:** {stats['avg_pnl_percent']:+.1f}%"
+        )
+        await ctx.send(msg)
+
+    @commands.command(name="predictions", aliases=["preds"])
+    async def show_predictions(self, ctx: commands.Context[commands.Bot], limit: int = 5) -> None:
+        """Show recent predictions. Usage: !predictions or !predictions 10"""
+        journal = get_journal()
+        recent = journal.get_recent_predictions(limit=min(limit, 10))
+
+        if not recent:
+            await ctx.send("📔 No predictions recorded yet.")
+            return
+
+        await ctx.send(f"📔 **Recent Predictions** (Last {len(recent)}):")
+        for pred in recent:
+            await ctx.send(journal.format_prediction_discord(pred))
+
+    @commands.command(name="audit_variance", aliases=["variance", "va"])
+    async def show_variance(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Run and show variance analysis."""
+        journal = get_journal()
+        await ctx.send("🔄 Running variance analysis...")
+
+        audit = journal.run_variance_analysis()
+        await ctx.send(journal.format_audit_discord(audit))
+
+    @commands.command(name="outcome", aliases=["result"])
+    async def update_outcome(
+        self,
+        ctx: commands.Context[commands.Bot],
+        pred_id: str,
+        result: str,
+        price: float,
+    ) -> None:
+        """Update prediction outcome. Usage: !outcome KLAC_20260216_100000 correct 125.50"""
+        journal = get_journal()
+
+        outcome_map = {
+            "correct": Outcome.CORRECT,
+            "incorrect": Outcome.INCORRECT,
+            "partial": Outcome.PARTIAL,
+            "c": Outcome.CORRECT,
+            "i": Outcome.INCORRECT,
+            "p": Outcome.PARTIAL,
+        }
+
+        outcome = outcome_map.get(result.lower())
+        if not outcome:
+            await ctx.send("❌ Invalid result. Use: correct, incorrect, or partial")
+            return
+
+        if journal.update_outcome(pred_id, outcome, price):
+            await ctx.send(f"✅ Updated {pred_id} to {outcome.value} at ${price:.2f}")
+        else:
+            await ctx.send(f"❌ Prediction {pred_id} not found")
+
     @commands.command(name="helpaudit", aliases=["riskhelp", "commands"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
@@ -153,16 +224,25 @@ class RiskCommands(commands.Cog):
 **📊 Risk Audit:**
 `!audit SYMBOL` - Full risk audit
 `!auditall` - Audit permanent watchlist
-`!catalyst SYMBOL reason` - Pre-catalyst audit
 `!hype SYMBOL` - Quick hype score
 `!vwap SYMBOL` - VWAP check
+
+**📔 Prediction Journal:**
+`!journal [days]` - Show prediction stats
+`!predictions [limit]` - Show recent predictions
+`!variance` - Run variance analysis
+`!outcome ID result price` - Update prediction outcome
 
 **📌 Permanent Watchlist:**
 `!permanent` - Show watchlist
 `!permadd SYMBOL` - Add symbol
 `!permremove SYMBOL` - Remove symbol
 
-**Conditions for Entry:** VWAP above, Volume confirmed, Not overextended, No dilution, Morning settled, Above support, Positive momentum
+**⏰ Scheduled Tasks (Auto):**
+• 4:00 AM - Pre-Market Digestion
+• 10:00 AM - VWAP Integrity Scan
+• 2:00 PM - 2 O'Clock Sweep
+• 8:00 PM - Recursive Audit
 """
         await ctx.send(help_text)
 
