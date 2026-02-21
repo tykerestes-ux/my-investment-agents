@@ -8,6 +8,7 @@ from discord.ext import commands
 from .adaptive_params import get_param_manager, get_params
 from .alert_system import get_alert_manager, AlertType
 from .analyst_ratings import get_analyst_ratings, format_analyst_discord
+from .opportunity_scanner import scan_for_opportunities, format_opportunities_discord, format_quick_opportunities, SCAN_UNIVERSE
 from .backtest import run_quick_backtest, Backtester
 from .earnings_calendar import get_earnings_date, format_earnings_discord
 from .economic_calendar import get_economic_calendar, format_calendar_discord
@@ -714,6 +715,108 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
+    # === OPPORTUNITY SCANNER ===
+
+    @commands.command(name="opportunities", aliases=["findbuys", "scanner"])
+    async def find_opportunities(self, ctx: commands.Context[commands.Bot], mode: str = "full") -> None:
+        """Scan market for buying opportunities. Usage: !opportunities or !opportunities quick"""
+        await ctx.send("🔍 **Scanning 120+ stocks for opportunities...** (this takes ~2 minutes)")
+        
+        try:
+            # Scan all sectors
+            opportunities = await scan_for_opportunities(
+                sectors=None,  # All sectors
+                min_score=55,  # Show more opportunities
+                max_results=25,
+            )
+            
+            if mode.lower() == "quick":
+                await ctx.send(format_quick_opportunities(opportunities, limit=10))
+            else:
+                messages = format_opportunities_discord(opportunities)
+                for msg in messages:
+                    await ctx.send(msg)
+                    
+        except Exception as e:
+            logger.error(f"Opportunity scan error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="opps", aliases=["opp", "buys"])
+    async def quick_opportunities(self, ctx: commands.Context[commands.Bot], sector: str = None) -> None:
+        """Quick opportunity scan. Usage: !opps or !opps tech or !opps semis"""
+        
+        # Map common names to sector keys
+        sector_map = {
+            "tech": ["tech"],
+            "semis": ["semiconductors"],
+            "semiconductors": ["semiconductors"],
+            "finance": ["financials"],
+            "financials": ["financials"],
+            "banks": ["financials"],
+            "health": ["healthcare"],
+            "healthcare": ["healthcare"],
+            "pharma": ["healthcare"],
+            "energy": ["energy"],
+            "oil": ["energy"],
+            "consumer": ["consumer"],
+            "retail": ["consumer"],
+            "industrial": ["industrials"],
+            "industrials": ["industrials"],
+            "all": None,
+        }
+        
+        if sector:
+            sectors = sector_map.get(sector.lower())
+            if sectors is None and sector.lower() != "all":
+                available = ", ".join(SCAN_UNIVERSE.keys())
+                await ctx.send(f"❌ Unknown sector. Available: {available}")
+                return
+            sector_name = sector.title()
+        else:
+            sectors = None
+            sector_name = "All Sectors"
+        
+        await ctx.send(f"🔍 **Scanning {sector_name}...** (30-60 seconds)")
+        
+        try:
+            opportunities = await scan_for_opportunities(
+                sectors=sectors,
+                min_score=55,
+                max_results=15,
+            )
+            
+            await ctx.send(format_quick_opportunities(opportunities, limit=10))
+            
+        except Exception as e:
+            logger.error(f"Quick scan error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="topopps", aliases=["best", "topbuys"])
+    async def top_opportunities(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Show only STRONG_BUY opportunities with high confidence."""
+        await ctx.send("🔍 **Scanning for STRONG_BUY setups...** (~2 minutes)")
+        
+        try:
+            opportunities = await scan_for_opportunities(
+                sectors=None,
+                min_score=75,  # Higher threshold
+                max_results=10,
+            )
+            
+            # Filter to only STRONG_BUY
+            strong = [o for o in opportunities if o.entry_type == "STRONG_BUY"]
+            
+            if not strong:
+                await ctx.send("📭 No STRONG_BUY setups found right now. Market may be extended or lacking clear setups.")
+                return
+            
+            messages = format_opportunities_discord(strong)
+            for msg in messages:
+                await ctx.send(msg)
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
     @commands.command(name="cmds", aliases=["commands", "help2", "helpaudit", "riskhelp"])
     async def show_commands(self, ctx: commands.Context[commands.Bot]) -> None:
         """Show all available commands."""
@@ -769,6 +872,14 @@ class RiskCommands(commands.Cog):
 │ `!entry SYMBOL`   │ Quick entry check     │
 │ `!scan`           │ Scan entire watchlist │
 │ `!position SYM $` │ Position sizing       │
+└─────────────────────────────────────────┘
+
+**🔍 OPPORTUNITY SCANNER**
+┌─────────────────────────────────────────┐
+│ `!opportunities`      │ Find buying opps  │
+│ `!opps`               │ Quick top 10      │
+│ `!opps tech`          │ Scan tech sector  │
+│ `!opps semis`         │ Scan semis only   │
 └─────────────────────────────────────────┘
 
 **📝 WATCHLIST**
