@@ -6,17 +6,24 @@ from typing import TYPE_CHECKING
 from discord.ext import commands
 
 from .adaptive_params import get_param_manager, get_params
+from .analyst_ratings import get_analyst_ratings, format_analyst_discord
 from .backtest import run_quick_backtest, Backtester
 from .earnings_calendar import get_earnings_date, format_earnings_discord
+from .economic_calendar import get_economic_calendar, format_calendar_discord
 from .enhanced_analyzer import EnhancedEntryAnalyzer, enhanced_analyze
 from .entry_signals import EntrySignalAnalyzer, EntrySignal
+from .insider_trading import get_insider_transactions, format_insider_discord
+from .institutional_holdings import get_institutional_holdings, format_institutional_discord
 from .multi_timeframe import get_multi_timeframe_data, format_multi_timeframe_discord
 from .news_sentiment import analyze_news_sentiment, format_news_discord
+from .options_flow import analyze_options_flow, format_options_discord
 from .permanent_watchlist import PermanentWatchlistMonitor, get_permanent_symbols
 from .position_sizing import calculate_position_size, format_position_size_discord
 from .prediction_journal import get_journal, PredictionType, Outcome
 from .risk_audit import RiskAuditor
 from .sector_correlation import analyze_sector_correlation, get_sector_summary, format_sector_discord
+from .short_interest import get_short_interest, format_short_interest_discord
+from .technical_indicators import get_technical_indicators, format_technicals_discord
 
 if TYPE_CHECKING:
     from .discord_client import InvestmentBot
@@ -424,40 +431,169 @@ class RiskCommands(commands.Cog):
         else:
             await ctx.send("\n✅ No parameter changes suggested - system performing well.")
 
-    @commands.command(name="helpaudit", aliases=["riskhelp", "commands"])
+    # === NEW DATA SOURCE COMMANDS ===
+
+    @commands.command(name="insider", aliases=["insiders"])
+    async def check_insider(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check insider trading activity. Usage: !insider KLAC"""
+        symbol = symbol.upper()
+        await ctx.send(f"👔 Checking insider activity for **{symbol}**...")
+        try:
+            data = await get_insider_transactions(symbol)
+            await ctx.send(format_insider_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="short", aliases=["shorts", "si"])
+    async def check_short_interest(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check short interest data. Usage: !short KLAC"""
+        symbol = symbol.upper()
+        try:
+            data = get_short_interest(symbol)
+            await ctx.send(format_short_interest_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="options", aliases=["flow", "pcr"])
+    async def check_options(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check options flow and put/call ratio. Usage: !options KLAC"""
+        symbol = symbol.upper()
+        await ctx.send(f"📈 Analyzing options flow for **{symbol}**...")
+        try:
+            data = analyze_options_flow(symbol)
+            await ctx.send(format_options_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="analysts", aliases=["analyst", "ratings"])
+    async def check_analysts(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check analyst ratings and price targets. Usage: !analysts KLAC"""
+        symbol = symbol.upper()
+        try:
+            data = get_analyst_ratings(symbol)
+            await ctx.send(format_analyst_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="technicals", aliases=["ta", "tech"])
+    async def check_technicals(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check technical indicators (RSI, MACD, etc). Usage: !technicals KLAC"""
+        symbol = symbol.upper()
+        try:
+            data = get_technical_indicators(symbol)
+            await ctx.send(format_technicals_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="institutions", aliases=["inst", "holders"])
+    async def check_institutions(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Check institutional holdings. Usage: !institutions KLAC"""
+        symbol = symbol.upper()
+        try:
+            data = get_institutional_holdings(symbol)
+            await ctx.send(format_institutional_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="calendar", aliases=["econ", "economic"])
+    async def check_calendar(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Check economic calendar for upcoming events."""
+        try:
+            data = get_economic_calendar()
+            await ctx.send(format_calendar_discord(data))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="fullreport", aliases=["report", "all"])
+    async def full_report(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Get complete report with ALL data sources. Usage: !fullreport KLAC"""
+        symbol = symbol.upper()
+        await ctx.send(f"📊 Generating full report for **{symbol}**... (this may take a moment)")
+        
+        try:
+            # Technical
+            tech = get_technical_indicators(symbol)
+            await ctx.send(format_technicals_discord(tech))
+            
+            # Short Interest
+            short = get_short_interest(symbol)
+            await ctx.send(format_short_interest_discord(short))
+            
+            # Analyst Ratings
+            analysts = get_analyst_ratings(symbol)
+            await ctx.send(format_analyst_discord(analysts))
+            
+            # Options Flow
+            options = analyze_options_flow(symbol)
+            await ctx.send(format_options_discord(options))
+            
+            # Institutional
+            inst = get_institutional_holdings(symbol)
+            await ctx.send(format_institutional_discord(inst))
+            
+            # Insider Trading
+            insider = await get_insider_transactions(symbol)
+            await ctx.send(format_insider_discord(insider))
+            
+            # Final summary
+            signals = []
+            if tech.overall_signal in ["STRONG_BUY", "BUY"]:
+                signals.append(f"✅ Technicals: {tech.overall_signal}")
+            elif tech.overall_signal in ["SELL", "STRONG_SELL"]:
+                signals.append(f"❌ Technicals: {tech.overall_signal}")
+            
+            if short.signal in ["LOW_SHORT", "SQUEEZE_POTENTIAL"]:
+                signals.append(f"✅ Short Interest: {short.signal}")
+            elif short.signal == "HIGH_SHORT":
+                signals.append(f"⚠️ Short Interest: {short.signal}")
+            
+            if analysts.signal in ["STRONG_BUY", "BUY"]:
+                signals.append(f"✅ Analysts: {analysts.signal}")
+            elif analysts.signal == "SELL":
+                signals.append(f"❌ Analysts: {analysts.signal}")
+            
+            if "BULLISH" in options.signal:
+                signals.append(f"✅ Options Flow: {options.signal}")
+            elif "BEARISH" in options.signal:
+                signals.append(f"❌ Options Flow: {options.signal}")
+            
+            summary = f"\n📋 **SUMMARY: {symbol}**\n" + "\n".join(signals)
+            await ctx.send(summary)
+            
+        except Exception as e:
+            logger.error(f"Full report error for {symbol}: {e}")
+            await ctx.send(f"❌ Error generating report: {str(e)[:200]}")
+
+    @commands.command(name="helpaudit", aliases=["riskhelp", "commands", "help2"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
-**🔬 Enhanced Analysis:**
-`!deep SYMBOL` - Full analysis with all 6 filters
-`!deepscan` - Enhanced scan of watchlist
+**📊 Full Analysis:**
+`!fullreport SYMBOL` - Complete report with ALL data
+`!deep SYMBOL` - Enhanced entry analysis
 
 **🎯 Entry Signals:**
 `!entry SYMBOL` - Quick entry check
-`!scan` - Scan watchlist for entries
+`!scan` - Scan watchlist
 
-**📊 Advanced Filters:**
-`!earnings SYMBOL` - Earnings calendar
-`!sector SYMBOL` - Sector crowding
-`!timeframe SYMBOL` - Multi-timeframe
-`!news SYMBOL` - News sentiment
-`!backtest SYMBOL` - Historical backtest
-`!size SYMBOL` - Position sizing
+**📈 Market Data:**
+`!technicals SYMBOL` - RSI, MACD, Bollinger, MAs
+`!short SYMBOL` - Short interest
+`!options SYMBOL` - Put/Call ratio, unusual activity
+`!analysts SYMBOL` - Price targets & ratings
+`!insider SYMBOL` - Executive buys/sells
+`!institutions SYMBOL` - 13F holdings
+
+**📅 Calendars:**
+`!earnings SYMBOL` - Earnings date
+`!calendar` - Economic events (FOMC, CPI, Jobs)
 
 **🧠 Adaptive Learning:**
-`!learn` - Run learning cycle & generate suggestions
+`!learn` - Generate improvement suggestions
 `!suggestions` - View pending changes
-`!params` - View current parameters
-`!approve ID` - Approve a change
-`!approveall` - Approve all changes
-`!reject ID` - Reject a change
+`!approveall` - Apply all changes
 
 **📔 Journal:**
 `!journal` - Prediction stats
-`!variance` - Run variance analysis
-
-**📌 Watchlist:**
-`!permanent` - Show watchlist
-`!permadd/permremove` - Manage watchlist
 """
         await ctx.send(help_text)
 
