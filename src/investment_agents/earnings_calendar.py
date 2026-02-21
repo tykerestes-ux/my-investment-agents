@@ -84,6 +84,11 @@ def get_earnings_date(symbol: str) -> EarningsInfo:
         elif isinstance(earnings_date, str):
             earnings_date = datetime.fromisoformat(earnings_date)
         
+        # Handle date vs datetime - convert date to datetime
+        from datetime import date
+        if isinstance(earnings_date, date) and not isinstance(earnings_date, datetime):
+            earnings_date = datetime.combine(earnings_date, datetime.min.time())
+        
         # Calculate days until earnings
         now = datetime.now()
         delta = earnings_date - now
