@@ -379,7 +379,7 @@ Found **{len(opportunities)}** potential setups
 {type_emoji} **#{i} {opp.symbol}** - {opp.entry_type} ({opp.confidence} confidence)
 ├─ Score: **{opp.total_score}/100** (Tech:{opp.technical_score} Fund:{opp.fundamental_score} Cat:{opp.catalyst_score})
 ├─ Price: ${opp.current_price:.2f} | 1D: {opp.change_1d:+.1f}% | 5D: {opp.change_5d:+.1f}%
-├─ RSI: {opp.rsi:.0f if opp.rsi else 'N/A'} | Volume: {opp.volume_ratio:.1f}x avg
+├─ RSI: {f'{opp.rsi:.0f}' if opp.rsi else 'N/A'} | Volume: {opp.volume_ratio:.1f}x avg
 """
         if opp.upside_pct:
             entry += f"├─ Target: ${opp.analyst_target:.2f} ({opp.upside_pct:+.0f}% upside)\n"
@@ -417,9 +417,11 @@ def format_quick_opportunities(opportunities: list[Opportunity], limit: int = 10
     
     for opp in opportunities[:limit]:
         emoji = "🟢" if opp.entry_type == "STRONG_BUY" else "🟡" if opp.entry_type == "BUY" else "🟠"
+        rsi_str = f"{opp.rsi:.0f}" if opp.rsi else "?"
+        signal_str = opp.signals[0] if opp.signals else ""
         lines.append(
             f"{emoji} **{opp.symbol}** ({opp.total_score}) ${opp.current_price:.2f} "
-            f"| RSI:{opp.rsi:.0f if opp.rsi else '?'} | {opp.signals[0] if opp.signals else ''}"
+            f"| RSI:{rsi_str} | {signal_str}"
         )
     
     lines.append("")
