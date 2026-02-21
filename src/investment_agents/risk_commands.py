@@ -8,6 +8,7 @@ from discord.ext import commands
 from .adaptive_params import get_param_manager, get_params
 from .alert_system import get_alert_manager, AlertType
 from .analyst_ratings import get_analyst_ratings, format_analyst_discord
+from .backtester import backtest_signals, format_backtest_discord, format_backtest_summary
 from .opportunity_scanner import scan_for_opportunities, format_opportunities_discord, format_quick_opportunities, SCAN_UNIVERSE
 from .backtest import run_quick_backtest, Backtester
 from .earnings_calendar import get_earnings_date, format_earnings_discord
@@ -817,6 +818,81 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
+    # === BACKTESTER ===
+
+    @commands.command(name="backtest", aliases=["bt", "test"])
+    async def run_backtest(self, ctx: commands.Context[commands.Bot], days: int = 30, min_score: int = 70) -> None:
+        """Backtest signal accuracy. Usage: !backtest or !backtest 60 75"""
+        await ctx.send(f"📊 **Running {days}-day backtest** (min score: {min_score})... This takes 2-3 minutes.")
+        
+        try:
+            result = await backtest_signals(
+                days=days,
+                sectors=None,  # All sectors
+                min_score=min_score,
+                hold_days=5,
+                stop_loss_pct=-5.0,
+                take_profit_pct=10.0,
+            )
+            
+            await ctx.send(format_backtest_discord(result))
+            
+        except Exception as e:
+            logger.error(f"Backtest error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="quickbt", aliases=["qbt"])
+    async def quick_backtest(self, ctx: commands.Context[commands.Bot], days: int = 14) -> None:
+        """Quick backtest summary."""
+        await ctx.send(f"📊 Running quick {days}-day backtest...")
+        
+        try:
+            result = await backtest_signals(
+                days=days,
+                min_score=70,
+                hold_days=5,
+            )
+            
+            await ctx.send(format_backtest_summary(result))
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
+    @commands.command(name="btcompare", aliases=["compare"])
+    async def compare_thresholds(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Compare different signal thresholds."""
+        await ctx.send("📊 **Comparing signal thresholds...** (3-5 minutes)")
+        
+        try:
+            results = []
+            for threshold in [60, 70, 80]:
+                result = await backtest_signals(
+                    days=30,
+                    min_score=threshold,
+                    hold_days=5,
+                )
+                results.append((threshold, result))
+            
+            lines = ["📊 **THRESHOLD COMPARISON** (30 days)", "═" * 40, ""]
+            
+            for threshold, r in results:
+                if r.trades_taken > 0:
+                    emoji = "✅" if r.win_rate >= 55 else "🟡" if r.win_rate >= 45 else "❌"
+                    lines.append(
+                        f"{emoji} **Score ≥ {threshold}:** {r.win_rate:.0f}% win | "
+                        f"{r.total_pnl_pct:+.1f}% P&L | {r.trades_taken} trades | PF: {r.profit_factor:.1f}"
+                    )
+                else:
+                    lines.append(f"⚪ **Score ≥ {threshold}:** No signals")
+            
+            lines.append("")
+            lines.append("*Higher threshold = fewer but higher quality signals*")
+            
+            await ctx.send("\n".join(lines))
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
     @commands.command(name="cmds", aliases=["commands", "help2", "helpaudit", "riskhelp"])
     async def show_commands(self, ctx: commands.Context[commands.Bot]) -> None:
         """Show all available commands."""
@@ -880,6 +956,15 @@ class RiskCommands(commands.Cog):
 │ `!opps`               │ Quick top 10      │
 │ `!opps tech`          │ Scan tech sector  │
 │ `!opps semis`         │ Scan semis only   │
+│ `!topopps`            │ STRONG_BUY only   │
+└─────────────────────────────────────────┘
+
+**📊 BACKTESTING**
+┌─────────────────────────────────────────┐
+│ `!backtest`           │ 30-day backtest   │
+│ `!backtest 60 75`     │ 60 days, score 75 │
+│ `!quickbt`            │ Quick 14-day test │
+│ `!btcompare`          │ Compare thresholds│
 └─────────────────────────────────────────┘
 
 **📝 WATCHLIST**
