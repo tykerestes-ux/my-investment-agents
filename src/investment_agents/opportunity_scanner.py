@@ -38,7 +38,7 @@ SCAN_UNIVERSE = {
                "DVN", "FANG", "HAL", "BKR", "KMI", "WMB", "OKE", "TRGP", "LNG", "ET"],
     # Consumer
     "consumer": ["COST", "WMT", "TGT", "HD", "LOW", "NKE", "SBUX", "MCD", "CMG", "YUM",
-                 "DPZ", "LULU", "DECK", "CROX", "BIRD", "LVMH", "TJX", "ROST", "DG", "DLTR"],
+                 "DPZ", "LULU", "DECK", "CROX", "TPR", "EL", "TJX", "ROST", "DG", "DLTR"],
     # Industrials  
     "industrials": ["CAT", "DE", "BA", "LMT", "RTX", "NOC", "GD", "GE", "HON", "MMM",
                     "UPS", "FDX", "CSX", "UNP", "NSC", "DAL", "UAL", "AAL", "LUV", "UBER"],
