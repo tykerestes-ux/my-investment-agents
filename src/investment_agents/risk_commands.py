@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from discord.ext import commands
 
+from .adaptive_params import get_param_manager, get_params
 from .backtest import run_quick_backtest, Backtester
 from .earnings_calendar import get_earnings_date, format_earnings_discord
 from .enhanced_analyzer import EnhancedEntryAnalyzer, enhanced_analyze
@@ -345,10 +346,88 @@ class RiskCommands(commands.Cog):
             logger.error(f"Deep scan error: {e}")
             await ctx.send(f"❌ Error: {str(e)[:200]}")
 
+    # === ADAPTIVE PARAMETER COMMANDS ===
+
+    @commands.command(name="suggestions", aliases=["pending", "suggest"])
+    async def show_suggestions(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Show pending parameter change suggestions."""
+        manager = get_param_manager()
+        await ctx.send(manager.get_pending_summary())
+
+    @commands.command(name="params", aliases=["parameters", "config"])
+    async def show_params(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Show current system parameters."""
+        manager = get_param_manager()
+        await ctx.send(manager.get_current_params_summary())
+
+    @commands.command(name="approve")
+    async def approve_change(self, ctx: commands.Context[commands.Bot], change_id: str) -> None:
+        """Approve a specific parameter change. Usage: !approve vwap_weight_20260221_120000"""
+        manager = get_param_manager()
+        if manager.approve_change(change_id):
+            await ctx.send(f"✅ Approved and applied change: `{change_id}`")
+            # Show new value
+            params = get_params()
+            await ctx.send(f"New parameters version: v{params.version}")
+        else:
+            await ctx.send(f"❌ Change not found: `{change_id}`")
+
+    @commands.command(name="approveall")
+    async def approve_all_changes(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Approve all pending parameter changes."""
+        manager = get_param_manager()
+        count = manager.approve_all()
+        if count > 0:
+            params = get_params()
+            await ctx.send(f"✅ Approved and applied {count} changes. Parameters now at v{params.version}")
+        else:
+            await ctx.send("📋 No pending changes to approve.")
+
+    @commands.command(name="reject")
+    async def reject_change(self, ctx: commands.Context[commands.Bot], change_id: str) -> None:
+        """Reject a specific parameter change. Usage: !reject vwap_weight_20260221_120000"""
+        manager = get_param_manager()
+        if manager.reject_change(change_id):
+            await ctx.send(f"❌ Rejected change: `{change_id}`")
+        else:
+            await ctx.send(f"❌ Change not found: `{change_id}`")
+
+    @commands.command(name="rejectall")
+    async def reject_all_changes(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Reject all pending parameter changes."""
+        manager = get_param_manager()
+        count = manager.reject_all()
+        await ctx.send(f"❌ Rejected {count} pending changes.")
+
+    @commands.command(name="learn", aliases=["adapt"])
+    async def run_learning(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Run variance analysis and generate improvement suggestions."""
+        await ctx.send("🧠 Running learning cycle...")
+        
+        journal = get_journal()
+        manager = get_param_manager()
+        
+        # Run variance analysis
+        audit = journal.run_variance_analysis()
+        await ctx.send(journal.format_audit_discord(audit))
+        
+        # Generate suggestions
+        suggestions = manager.generate_suggestions_from_audit(
+            accuracy=audit.accuracy_rate,
+            common_failures=audit.common_failures,
+            weight_adjustments=audit.weight_adjustments,
+        )
+        
+        if suggestions:
+            await ctx.send(f"\n🔧 Generated {len(suggestions)} improvement suggestions:")
+            await ctx.send(manager.get_pending_summary())
+        else:
+            await ctx.send("\n✅ No parameter changes suggested - system performing well.")
+
     @commands.command(name="helpaudit", aliases=["riskhelp", "commands"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
-**🔬 Enhanced Analysis (NEW):**
+**🔬 Enhanced Analysis:**
 `!deep SYMBOL` - Full analysis with all 6 filters
 `!deepscan` - Enhanced scan of watchlist
 
@@ -357,20 +436,28 @@ class RiskCommands(commands.Cog):
 `!scan` - Scan watchlist for entries
 
 **📊 Advanced Filters:**
-`!earnings SYMBOL` - Earnings calendar check
-`!sector SYMBOL` - Sector correlation/crowding
-`!timeframe SYMBOL` - Multi-timeframe alignment
-`!news SYMBOL` - News sentiment analysis
-`!backtest SYMBOL [days]` - Historical backtest
-`!size SYMBOL [account]` - Position sizing
+`!earnings SYMBOL` - Earnings calendar
+`!sector SYMBOL` - Sector crowding
+`!timeframe SYMBOL` - Multi-timeframe
+`!news SYMBOL` - News sentiment
+`!backtest SYMBOL` - Historical backtest
+`!size SYMBOL` - Position sizing
 
-**📔 Prediction Journal:**
-`!journal [days]` - Prediction stats
+**🧠 Adaptive Learning:**
+`!learn` - Run learning cycle & generate suggestions
+`!suggestions` - View pending changes
+`!params` - View current parameters
+`!approve ID` - Approve a change
+`!approveall` - Approve all changes
+`!reject ID` - Reject a change
+
+**📔 Journal:**
+`!journal` - Prediction stats
 `!variance` - Run variance analysis
 
 **📌 Watchlist:**
 `!permanent` - Show watchlist
-`!permadd/permremove SYMBOL` - Manage watchlist
+`!permadd/permremove` - Manage watchlist
 """
         await ctx.send(help_text)
 

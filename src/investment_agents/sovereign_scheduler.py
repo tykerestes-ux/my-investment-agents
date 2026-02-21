@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import discord
 from apscheduler.triggers.cron import CronTrigger
 
+from .adaptive_params import get_param_manager
 from .entry_signals import EntrySignalAnalyzer, EntrySignal
 from .prediction_journal import get_journal, PredictionType, Outcome
 from .market_data import MarketDataFetcher
@@ -274,6 +275,28 @@ class SovereignScheduler:
         # Run variance analysis
         audit = self.journal.run_variance_analysis()
         await self._send_message(self.journal.format_audit_discord(audit))
+
+        # Generate improvement suggestions
+        param_manager = get_param_manager()
+        suggestions = param_manager.generate_suggestions_from_audit(
+            accuracy=audit.accuracy_rate,
+            common_failures=audit.common_failures,
+            weight_adjustments=audit.weight_adjustments,
+        )
+
+        if suggestions:
+            await self._send_message(
+                f"\n🧠 **Learning System Generated {len(suggestions)} Suggestions**\n"
+                f"Use `!suggestions` to view and `!approveall` to apply."
+            )
+            # Show brief summary
+            for s in suggestions[:3]:
+                await self._send_message(
+                    f"• {s.parameter}: {s.current_value} → {s.suggested_value}\n"
+                    f"  Reason: {s.reason}"
+                )
+            if len(suggestions) > 3:
+                await self._send_message(f"... and {len(suggestions) - 3} more. Use `!suggestions` to see all.")
 
         # Show stats
         stats = self.journal.get_stats(days=7)
