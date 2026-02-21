@@ -9,10 +9,12 @@ import discord
 from apscheduler.triggers.cron import CronTrigger
 
 from .adaptive_params import get_param_manager
+from .alert_system import get_alert_manager
 from .entry_signals import EntrySignalAnalyzer, EntrySignal
 from .prediction_journal import get_journal, PredictionType, Outcome
 from .market_data import MarketDataFetcher
 from .permanent_watchlist import get_permanent_symbols
+from .risk_dashboard import get_risk_dashboard, format_quick_dashboard_discord
 from .scheduler import DailyUpdateScheduler
 
 if TYPE_CHECKING:
@@ -71,6 +73,24 @@ class SovereignScheduler:
             replace_existing=True,
         )
         logger.info("Scheduled: 8:00 PM Recursive Audit")
+
+        # Alert checking - every 30 minutes during market hours
+        self.scheduler.scheduler.add_job(
+            self._check_alerts,
+            CronTrigger(day_of_week="mon-fri", hour="9-16", minute="0,30", timezone=tz),
+            id="alert_check",
+            replace_existing=True,
+        )
+        logger.info("Scheduled: Alert checks every 30 min (9AM-4PM)")
+
+        # Morning risk dashboard - 9:00 AM
+        self.scheduler.scheduler.add_job(
+            self._morning_risk_check,
+            CronTrigger(day_of_week="mon-fri", hour=9, minute=0, timezone=tz),
+            id="morning_risk",
+            replace_existing=True,
+        )
+        logger.info("Scheduled: 9:00 AM Morning Risk Dashboard")
 
     async def _premarket_digestion(self) -> None:
         """4:00 AM - Pre-market analysis and data refresh."""
@@ -306,6 +326,47 @@ class SovereignScheduler:
             f"• Total P&L: {stats['total_pnl_percent']:+.1f}%\n"
             f"• Predictions: {stats['total_predictions']}"
         )
+
+    async def _check_alerts(self) -> None:
+        """Check all active alerts and notify on triggers."""
+        logger.info("Checking alerts...")
+        
+        manager = get_alert_manager()
+        triggered = await manager.check_all_alerts()
+        
+        if triggered:
+            await self._send_message("🔔 **ALERT TRIGGERED**")
+            for alert in triggered:
+                await self._send_message(alert.message)
+                await asyncio.sleep(0.5)
+            
+            logger.info(f"Triggered {len(triggered)} alerts")
+
+    async def _morning_risk_check(self) -> None:
+        """9:00 AM - Morning risk dashboard."""
+        logger.info("Running morning risk check...")
+        
+        await self._send_message(
+            f"☀️ **MORNING RISK CHECK** - {datetime.now().strftime('%B %d, %Y')}\n"
+            "─" * 40
+        )
+        
+        try:
+            dashboard = get_risk_dashboard()
+            await self._send_message(format_quick_dashboard_discord(dashboard))
+            
+            # Show any warnings
+            if dashboard.overall_risk_level in ["HIGH", "EXTREME"]:
+                await self._send_message("⚠️ **HIGH RISK DAY** - Consider reduced position sizes")
+            
+            # Check active alerts
+            alert_manager = get_alert_manager()
+            active = alert_manager.get_active_alerts()
+            if active:
+                await self._send_message(f"🔔 {len(active)} active alerts monitoring")
+                
+        except Exception as e:
+            logger.error(f"Morning risk check error: {e}")
 
     async def _send_message(self, content: str) -> None:
         """Send message to Discord channel."""

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from discord.ext import commands
 
 from .adaptive_params import get_param_manager, get_params
+from .alert_system import get_alert_manager, AlertType
 from .analyst_ratings import get_analyst_ratings, format_analyst_discord
 from .backtest import run_quick_backtest, Backtester
 from .earnings_calendar import get_earnings_date, format_earnings_discord
@@ -21,6 +22,7 @@ from .permanent_watchlist import PermanentWatchlistMonitor, get_permanent_symbol
 from .position_sizing import calculate_position_size, format_position_size_discord
 from .prediction_journal import get_journal, PredictionType, Outcome
 from .risk_audit import RiskAuditor
+from .risk_dashboard import get_risk_dashboard, format_dashboard_discord, format_quick_dashboard_discord
 from .sector_correlation import analyze_sector_correlation, get_sector_summary, format_sector_discord
 from .short_interest import get_short_interest, format_short_interest_discord
 from .technical_indicators import get_technical_indicators, format_technicals_discord
@@ -564,36 +566,185 @@ class RiskCommands(commands.Cog):
             logger.error(f"Full report error for {symbol}: {e}")
             await ctx.send(f"❌ Error generating report: {str(e)[:200]}")
 
+    # === ALERT SYSTEM COMMANDS ===
+
+    @commands.command(name="alert", aliases=["setalert"])
+    async def add_alert(self, ctx: commands.Context[commands.Bot], symbol: str, alert_type: str, value: float = 0) -> None:
+        """Add an alert. Usage: !alert KLAC target 150 or !alert KLAC stop 120 or !alert KLAC rsi"""
+        symbol = symbol.upper()
+        manager = get_alert_manager()
+        
+        alert_type = alert_type.lower()
+        
+        if alert_type in ["target", "above", "price"]:
+            if value <= 0:
+                await ctx.send("❌ Please provide a target price. Usage: `!alert KLAC target 150`")
+                return
+            alert = manager.add_price_alert(symbol, value, "above")
+            await ctx.send(f"🎯 Alert set: Notify when **{symbol}** reaches **${value:.2f}**")
+            
+        elif alert_type in ["stop", "below", "stoploss"]:
+            if value <= 0:
+                await ctx.send("❌ Please provide a stop price. Usage: `!alert KLAC stop 120`")
+                return
+            alert = manager.add_price_alert(symbol, value, "below")
+            await ctx.send(f"🛑 Alert set: Notify when **{symbol}** drops to **${value:.2f}**")
+            
+        elif alert_type in ["rsi", "oversold"]:
+            alert = manager.add_rsi_alert(symbol, oversold=True)
+            await ctx.send(f"📉 Alert set: Notify when **{symbol}** RSI goes below 30 (oversold)")
+            
+        elif alert_type in ["overbought", "rsihigh"]:
+            alert = manager.add_rsi_alert(symbol, oversold=False)
+            await ctx.send(f"📈 Alert set: Notify when **{symbol}** RSI goes above 70 (overbought)")
+            
+        elif alert_type in ["insider", "insiders"]:
+            alert = manager.add_insider_alert(symbol)
+            await ctx.send(f"👔 Alert set: Notify when **{symbol}** insider buying detected")
+            
+        elif alert_type in ["move", "percent", "pct"]:
+            if value <= 0:
+                value = 5  # Default 5%
+            alert = manager.add_percent_change_alert(symbol, value)
+            await ctx.send(f"🚨 Alert set: Notify when **{symbol}** moves **{value}%** in a day")
+            
+        else:
+            await ctx.send(
+                "❌ Unknown alert type. Options:\n"
+                "• `!alert KLAC target 150` - Price reaches $150\n"
+                "• `!alert KLAC stop 120` - Price drops to $120\n"
+                "• `!alert KLAC rsi` - RSI goes oversold (<30)\n"
+                "• `!alert KLAC overbought` - RSI goes overbought (>70)\n"
+                "• `!alert KLAC insider` - Insider buying detected\n"
+                "• `!alert KLAC move 5` - Moves 5% in a day"
+            )
+
+    @commands.command(name="alerts", aliases=["myalerts", "listalerts"])
+    async def list_alerts(self, ctx: commands.Context[commands.Bot], symbol: str | None = None) -> None:
+        """List all active alerts. Usage: !alerts or !alerts KLAC"""
+        manager = get_alert_manager()
+        await ctx.send(manager.format_alerts_discord(symbol))
+
+    @commands.command(name="removealert", aliases=["delalert", "cancelalert"])
+    async def remove_alert(self, ctx: commands.Context[commands.Bot], alert_id: str) -> None:
+        """Remove an alert by ID. Usage: !removealert KLAC_price_above_..."""
+        manager = get_alert_manager()
+        
+        # Allow partial ID match
+        matching = [a for a in manager.alerts if alert_id in a.id]
+        
+        if not matching:
+            await ctx.send(f"❌ Alert not found: `{alert_id}`")
+            return
+        
+        if len(matching) > 1:
+            await ctx.send(f"⚠️ Multiple matches. Be more specific:\n" + "\n".join([f"• `{a.id}`" for a in matching]))
+            return
+        
+        if manager.remove_alert(matching[0].id):
+            await ctx.send(f"✅ Alert removed: `{matching[0].id[:40]}...`")
+        else:
+            await ctx.send("❌ Failed to remove alert")
+
+    @commands.command(name="clearalerts")
+    async def clear_alerts(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Remove all alerts for a symbol. Usage: !clearalerts KLAC"""
+        symbol = symbol.upper()
+        manager = get_alert_manager()
+        
+        alerts = manager.get_alerts_by_symbol(symbol)
+        if not alerts:
+            await ctx.send(f"📭 No alerts found for {symbol}")
+            return
+        
+        for alert in alerts:
+            manager.remove_alert(alert.id)
+        
+        await ctx.send(f"✅ Removed {len(alerts)} alerts for {symbol}")
+
+    @commands.command(name="checkalerts")
+    async def check_alerts_now(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Manually check all alerts now."""
+        await ctx.send("🔍 Checking all alerts...")
+        manager = get_alert_manager()
+        triggered = await manager.check_all_alerts()
+        
+        if triggered:
+            for alert in triggered:
+                await ctx.send(alert.message)
+        else:
+            await ctx.send("✅ No alerts triggered")
+
+    # === RISK DASHBOARD COMMANDS ===
+
+    @commands.command(name="dashboard", aliases=["dash", "risk"])
+    async def show_dashboard(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Show full risk dashboard."""
+        await ctx.send("📊 Generating risk dashboard...")
+        try:
+            dash = get_risk_dashboard()
+            # Split into multiple messages if needed
+            full_msg = format_dashboard_discord(dash)
+            
+            if len(full_msg) > 1900:
+                # Send in chunks
+                lines = full_msg.split("\n")
+                chunk = ""
+                for line in lines:
+                    if len(chunk) + len(line) > 1900:
+                        await ctx.send(chunk)
+                        chunk = line + "\n"
+                    else:
+                        chunk += line + "\n"
+                if chunk:
+                    await ctx.send(chunk)
+            else:
+                await ctx.send(full_msg)
+                
+        except Exception as e:
+            logger.error(f"Dashboard error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="quickrisk", aliases=["qr", "riskcheck"])
+    async def quick_risk(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Quick risk summary."""
+        try:
+            dash = get_risk_dashboard()
+            await ctx.send(format_quick_dashboard_discord(dash))
+        except Exception as e:
+            await ctx.send(f"❌ Error: {str(e)[:100]}")
+
     @commands.command(name="helpaudit", aliases=["riskhelp", "commands", "help2"])
     async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
         help_text = """
-**📊 Full Analysis:**
-`!fullreport SYMBOL` - Complete report with ALL data
-`!deep SYMBOL` - Enhanced entry analysis
+**🔔 Alerts:**
+`!alert SYMBOL target 150` - Price target
+`!alert SYMBOL stop 120` - Stop loss
+`!alert SYMBOL rsi` - RSI oversold
+`!alert SYMBOL insider` - Insider buying
+`!alerts` - View all alerts
+`!removealert ID` - Remove alert
+`!checkalerts` - Check now
+
+**📊 Risk Dashboard:**
+`!dashboard` - Full risk analysis
+`!quickrisk` - Quick summary
+
+**📈 Analysis:**
+`!fullreport SYMBOL` - All data sources
+`!technicals SYMBOL` - RSI, MACD, MAs
+`!short SYMBOL` - Short interest
+`!options SYMBOL` - Options flow
+`!analysts SYMBOL` - Price targets
+`!insider SYMBOL` - Insider trades
 
 **🎯 Entry Signals:**
-`!entry SYMBOL` - Quick entry check
+`!entry SYMBOL` - Entry check
 `!scan` - Scan watchlist
 
-**📈 Market Data:**
-`!technicals SYMBOL` - RSI, MACD, Bollinger, MAs
-`!short SYMBOL` - Short interest
-`!options SYMBOL` - Put/Call ratio, unusual activity
-`!analysts SYMBOL` - Price targets & ratings
-`!insider SYMBOL` - Executive buys/sells
-`!institutions SYMBOL` - 13F holdings
-
-**📅 Calendars:**
-`!earnings SYMBOL` - Earnings date
-`!calendar` - Economic events (FOMC, CPI, Jobs)
-
-**🧠 Adaptive Learning:**
-`!learn` - Generate improvement suggestions
-`!suggestions` - View pending changes
-`!approveall` - Apply all changes
-
-**📔 Journal:**
-`!journal` - Prediction stats
+**🧠 Learning:**
+`!learn` - Improve params
+`!approveall` - Apply changes
 """
         await ctx.send(help_text)
 
