@@ -57,7 +57,7 @@ def get_institutional_holdings(symbol: str) -> InstitutionalData:
         top_holders: list[InstitutionalHolder] = []
         try:
             inst_holders = ticker.institutional_holders
-            if inst_holders is not None and not inst_holders.empty:
+            if inst_holders is not None and hasattr(inst_holders, 'empty') and not inst_holders.empty:
                 for _, row in inst_holders.head(10).iterrows():
                     top_holders.append(InstitutionalHolder(
                         name=str(row.get("Holder", "Unknown"))[:40],

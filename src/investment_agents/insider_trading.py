@@ -69,7 +69,7 @@ async def get_insider_transactions(symbol: str, days: int = 90) -> InsiderSummar
         # Get insider transactions
         insider_transactions = ticker.insider_transactions
         
-        if insider_transactions is not None and not insider_transactions.empty:
+        if insider_transactions is not None and hasattr(insider_transactions, 'empty') and not insider_transactions.empty:
             cutoff = datetime.now() - timedelta(days=days)
             
             for _, row in insider_transactions.iterrows():

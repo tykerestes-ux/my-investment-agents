@@ -71,7 +71,7 @@ def get_analyst_ratings(symbol: str) -> AnalystSummary:
         try:
             # yfinance has recommendations history
             recs = ticker.recommendations
-            if recs is not None and not recs.empty:
+            if recs is not None and hasattr(recs, 'empty') and not recs.empty:
                 cutoff = datetime.now() - timedelta(days=90)
                 
                 for idx, row in recs.iterrows():
