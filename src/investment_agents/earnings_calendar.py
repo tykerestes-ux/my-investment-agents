@@ -30,25 +30,37 @@ def get_earnings_date(symbol: str) -> EarningsInfo:
     try:
         ticker = yf.Ticker(symbol)
         
-        # Try to get earnings dates
-        calendar = ticker.calendar
-        
         earnings_date = None
-        if calendar is not None and not calendar.empty:
-            # calendar is a DataFrame with earnings info
-            if 'Earnings Date' in calendar.index:
-                earnings_dates = calendar.loc['Earnings Date']
-                if hasattr(earnings_dates, '__iter__') and len(earnings_dates) > 0:
-                    # Get the first (next) earnings date
-                    next_date = earnings_dates.iloc[0] if hasattr(earnings_dates, 'iloc') else earnings_dates
-                    if next_date is not None:
-                        earnings_date = next_date
+        
+        # Try to get earnings dates from calendar
+        try:
+            calendar = ticker.calendar
+            
+            if calendar is not None:
+                # Handle dict format (newer yfinance)
+                if isinstance(calendar, dict):
+                    if 'Earnings Date' in calendar:
+                        ed = calendar['Earnings Date']
+                        if isinstance(ed, list) and len(ed) > 0:
+                            earnings_date = ed[0]
+                        elif ed is not None:
+                            earnings_date = ed
+                # Handle DataFrame format (older yfinance)
+                elif hasattr(calendar, 'empty') and not calendar.empty:
+                    if 'Earnings Date' in calendar.index:
+                        earnings_dates = calendar.loc['Earnings Date']
+                        if hasattr(earnings_dates, 'iloc') and len(earnings_dates) > 0:
+                            earnings_date = earnings_dates.iloc[0]
+                        elif earnings_dates is not None:
+                            earnings_date = earnings_dates
+        except Exception:
+            pass
         
         # Also check earnings_dates property
         if earnings_date is None:
             try:
                 earnings_df = ticker.earnings_dates
-                if earnings_df is not None and not earnings_df.empty:
+                if earnings_df is not None and hasattr(earnings_df, 'empty') and not earnings_df.empty:
                     # Get future dates only
                     now = datetime.now()
                     future_dates = [d for d in earnings_df.index if d.to_pydatetime() > now]
