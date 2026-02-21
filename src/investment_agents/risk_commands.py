@@ -714,39 +714,81 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
-    @commands.command(name="helpaudit", aliases=["riskhelp", "commands", "help2"])
-    async def help_audit(self, ctx: commands.Context[commands.Bot]) -> None:
-        help_text = """
-**🔔 Alerts:**
-`!alert SYMBOL target 150` - Price target
-`!alert SYMBOL stop 120` - Stop loss
-`!alert SYMBOL rsi` - RSI oversold
-`!alert SYMBOL insider` - Insider buying
-`!alerts` - View all alerts
-`!removealert ID` - Remove alert
-`!checkalerts` - Check now
+    @commands.command(name="cmds", aliases=["commands", "help2", "helpaudit", "riskhelp"])
+    async def show_commands(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Show all available commands."""
+        help_page1 = """
+╔══════════════════════════════════════════╗
+║       📋 INVESTMENT BOT COMMANDS         ║
+╚══════════════════════════════════════════╝
 
-**📊 Risk Dashboard:**
-`!dashboard` - Full risk analysis
-`!quickrisk` - Quick summary
+**🔔 ALERTS**
+┌─────────────────────────────────────────┐
+│ `!alert SYMBOL target PRICE` │ Price target    │
+│ `!alert SYMBOL stop PRICE`   │ Stop loss       │
+│ `!alert SYMBOL rsi`          │ RSI oversold    │
+│ `!alert SYMBOL overbought`   │ RSI overbought  │
+│ `!alert SYMBOL insider`      │ Insider buying  │
+│ `!alert SYMBOL move %`       │ % daily move    │
+│ `!alerts`                    │ View all alerts │
+│ `!removealert ID`            │ Remove alert    │
+│ `!clearalerts SYMBOL`        │ Clear all       │
+│ `!checkalerts`               │ Check now       │
+└─────────────────────────────────────────┘
 
-**📈 Analysis:**
-`!fullreport SYMBOL` - All data sources
-`!technicals SYMBOL` - RSI, MACD, MAs
-`!short SYMBOL` - Short interest
-`!options SYMBOL` - Options flow
-`!analysts SYMBOL` - Price targets
-`!insider SYMBOL` - Insider trades
+**📊 RISK DASHBOARD**
+┌─────────────────────────────────────────┐
+│ `!dashboard`    │ Full risk analysis      │
+│ `!quickrisk`    │ Quick summary           │
+└─────────────────────────────────────────┘
 
-**🎯 Entry Signals:**
-`!entry SYMBOL` - Entry check
-`!scan` - Scan watchlist
-
-**🧠 Learning:**
-`!learn` - Improve params
-`!approveall` - Apply changes
+**📈 FULL ANALYSIS**
+┌─────────────────────────────────────────┐
+│ `!fullreport SYMBOL` │ ALL data sources  │
+│ `!deep SYMBOL`       │ Enhanced entry    │
+│ `!audit SYMBOL`      │ Risk audit        │
+└─────────────────────────────────────────┘
 """
-        await ctx.send(help_text)
+        help_page2 = """
+**📉 MARKET DATA**
+┌─────────────────────────────────────────┐
+│ `!technicals SYMBOL` │ RSI, MACD, MAs      │
+│ `!short SYMBOL`      │ Short interest      │
+│ `!options SYMBOL`    │ Options flow        │
+│ `!analysts SYMBOL`   │ Price targets       │
+│ `!insider SYMBOL`    │ Insider trades      │
+│ `!institutions SYM`  │ 13F holdings        │
+│ `!earnings SYMBOL`   │ Earnings date       │
+│ `!calendar`          │ Economic events     │
+│ `!sector SYMBOL`     │ Sector correlation  │
+│ `!news SYMBOL`       │ News sentiment      │
+└─────────────────────────────────────────┘
+
+**🎯 ENTRY SIGNALS**
+┌─────────────────────────────────────────┐
+│ `!entry SYMBOL`   │ Quick entry check     │
+│ `!scan`           │ Scan entire watchlist │
+│ `!position SYM $` │ Position sizing       │
+└─────────────────────────────────────────┘
+
+**📝 WATCHLIST**
+┌─────────────────────────────────────────┐
+│ `!watchlist`          │ View watchlist    │
+│ `!permadd SYMBOL`     │ Add to watchlist  │
+│ `!permremove SYMBOL`  │ Remove from list  │
+└─────────────────────────────────────────┘
+
+**🧠 LEARNING SYSTEM**
+┌─────────────────────────────────────────┐
+│ `!learn`       │ Generate improvements   │
+│ `!suggestions` │ View pending changes    │
+│ `!approveall`  │ Apply all changes       │
+│ `!journal`     │ View prediction stats   │
+│ `!params`      │ Current parameters      │
+└─────────────────────────────────────────┘
+"""
+        await ctx.send(help_page1)
+        await ctx.send(help_page2)
 
 
 async def setup_risk_commands(bot: "InvestmentBot", monitor: PermanentWatchlistMonitor) -> None:
