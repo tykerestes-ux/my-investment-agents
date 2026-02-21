@@ -171,11 +171,12 @@ def get_risk_dashboard() -> RiskDashboard:
         except Exception as e:
             logger.error(f"Error analyzing {symbol}: {e}")
     
-    # Sector concentration
+    # Sector concentration (disabled for now - enable when portfolio is more diversified)
     largest_sector = max(sector_breakdown.keys(), key=lambda k: len(sector_breakdown[k])) if sector_breakdown else None
     sector_concentration_warning = False
-    if largest_sector and len(sector_breakdown.get(largest_sector, [])) >= len(symbols) * 0.5:
-        sector_concentration_warning = True
+    # TODO: Re-enable when portfolio is diversified
+    # if largest_sector and len(sector_breakdown.get(largest_sector, [])) >= len(symbols) * 0.5:
+    #     sector_concentration_warning = True
     
     # Economic calendar
     econ = get_economic_calendar()
@@ -189,10 +190,10 @@ def get_risk_dashboard() -> RiskDashboard:
         risk_score += 15
         recommendations.append(f"⚠️ {len(earnings_soon)} symbols have earnings within 7 days")
     
-    # Adjust for sector concentration
-    if sector_concentration_warning:
-        risk_score += 10
-        recommendations.append(f"⚠️ Heavy concentration in {largest_sector} sector")
+    # Adjust for sector concentration (disabled for now)
+    # if sector_concentration_warning:
+    #     risk_score += 10
+    #     recommendations.append(f"⚠️ Heavy concentration in {largest_sector} sector")
     
     # Adjust for overbought
     if len(overbought) >= len(symbols) * 0.3:
