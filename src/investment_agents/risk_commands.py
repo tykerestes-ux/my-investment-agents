@@ -679,7 +679,7 @@ class RiskCommands(commands.Cog):
 
     # === RISK DASHBOARD COMMANDS ===
 
-    @commands.command(name="dashboard", aliases=["dash", "risk"])
+    @commands.command(name="dashboard", aliases=["dash", "riskdash"])
     async def show_dashboard(self, ctx: commands.Context[commands.Bot]) -> None:
         """Show full risk dashboard."""
         await ctx.send("📊 Generating risk dashboard...")
