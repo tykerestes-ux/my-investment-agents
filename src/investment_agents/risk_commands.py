@@ -8,6 +8,7 @@ from discord.ext import commands
 from .adaptive_params import get_param_manager, get_params
 from .alert_system import get_alert_manager, AlertType
 from .analyst_ratings import get_analyst_ratings, format_analyst_discord
+from .verified_prediction import generate_verified_prediction, format_prediction_discord, PredictionSignal
 from .backtester import backtest_signals, format_backtest_discord, format_backtest_summary
 from .opportunity_scanner import scan_for_opportunities, format_opportunities_discord, format_quick_opportunities, SCAN_UNIVERSE
 from .backtest import run_quick_backtest, Backtester
@@ -818,6 +819,71 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
+    # === VERIFIED PREDICTIONS (No Look-Ahead Bias) ===
+
+    @commands.command(name="predict", aliases=["vp", "verified"])
+    async def verified_prediction(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Generate verified prediction with no look-ahead bias. Usage: !predict KLAC"""
+        symbol = symbol.upper()
+        await ctx.send(f"🔍 Generating verified prediction for **{symbol}**...")
+        
+        try:
+            prediction = await generate_verified_prediction(symbol)
+            await ctx.send(format_prediction_discord(prediction))
+            
+        except Exception as e:
+            logger.error(f"Prediction error for {symbol}: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="predictscan", aliases=["vpscan", "vscan"])
+    async def verified_scan(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Scan watchlist with verified predictions."""
+        symbols = get_permanent_symbols()
+        await ctx.send(f"🔍 Running verified prediction scan on {len(symbols)} symbols...")
+        
+        try:
+            results = []
+            for symbol in symbols:
+                pred = await generate_verified_prediction(symbol)
+                results.append(pred)
+                await asyncio.sleep(0.5)
+            
+            # Sort by probability
+            results.sort(key=lambda x: x.probability_of_success, reverse=True)
+            
+            # Summary
+            lines = [
+                "📊 **VERIFIED PREDICTION SCAN**",
+                "═" * 40,
+                "",
+            ]
+            
+            for pred in results:
+                signal_emoji = {
+                    PredictionSignal.STRONG_BUY: "🟢🟢",
+                    PredictionSignal.BUY: "🟢",
+                    PredictionSignal.NEUTRAL: "🟡",
+                    PredictionSignal.AVOID: "🔴",
+                    PredictionSignal.HIGH_RISK_DIVERGENCE: "⚠️",
+                }.get(pred.signal, "⚪")
+                
+                vol_flag = " 📉vol" if pred.volume_penalty_applied else ""
+                tier_pass = sum(1 for t in pred.tier_results if t.passed)
+                
+                lines.append(
+                    f"{signal_emoji} **{pred.symbol}** - {pred.probability_of_success:.0f}% prob "
+                    f"| ${pred.current_price:.2f} | T:{tier_pass}/3{vol_flag}"
+                )
+            
+            lines.append("")
+            lines.append("Use `!predict SYMBOL` for full analysis")
+            
+            await ctx.send("\n".join(lines))
+            
+        except Exception as e:
+            logger.error(f"Verified scan error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
     # === BACKTESTER ===
 
     @commands.command(name="backtest", aliases=["bt", "test"])
@@ -949,6 +1015,13 @@ class RiskCommands(commands.Cog):
 │ `!scan`           │ Scan entire watchlist │
 │ `!position SYM $` │ Position sizing       │
 └─────────────────────────────────────────┘
+
+**🔮 VERIFIED PREDICTIONS** (No Look-Ahead Bias)
+┌─────────────────────────────────────────┐
+│ `!predict SYMBOL` │ Full verified pred    │
+│ `!predictscan`    │ Scan watchlist        │
+└─────────────────────────────────────────┘
+*3-tier verification, 2x ATR cap, volume conviction*
 
 **🔍 OPPORTUNITY SCANNER**
 ┌─────────────────────────────────────────┐
