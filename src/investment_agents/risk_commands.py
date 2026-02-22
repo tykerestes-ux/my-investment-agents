@@ -887,7 +887,7 @@ class RiskCommands(commands.Cog):
 
     # === REFINED TARGETS (Semi Equipment) ===
 
-    @commands.command(name="target", aliases=["pt", "pricetarget"])
+    @commands.command(name="calibrate", aliases=["cal", "refinedtarget", "caltarget"])
     async def refined_target(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
         """Get refined price target with geopolitical adjustments. Usage: !target LRCX"""
         symbol = symbol.upper()
@@ -901,7 +901,7 @@ class RiskCommands(commands.Cog):
             logger.error(f"Refined target error for {symbol}: {e}")
             await ctx.send(f"❌ Error: {str(e)[:200]}")
 
-    @commands.command(name="targetscan", aliases=["ptscan"])
+    @commands.command(name="calscan", aliases=["calibratescan"])
     async def target_scan(self, ctx: commands.Context[commands.Bot]) -> None:
         """Scan semi equipment stocks for refined targets."""
         from .refined_targets import SEMI_EQUIPMENT
@@ -1092,8 +1092,8 @@ class RiskCommands(commands.Cog):
 
 **🎯 REFINED TARGETS** (Semi Equipment)
 ┌─────────────────────────────────────────┐
-│ `!target LRCX`    │ Refined price target  │
-│ `!targetscan`     │ Scan LRCX/KLAC/ASML   │
+│ `!calibrate LRCX` │ Refined price target  │
+│ `!calscan`        │ Scan LRCX/KLAC/ASML   │
 └─────────────────────────────────────────┘
 *Geopolitical haircut, SOXX cap, margin override*
 
