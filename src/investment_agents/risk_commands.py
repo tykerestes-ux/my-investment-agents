@@ -889,15 +889,56 @@ class RiskCommands(commands.Cog):
 
     @commands.command(name="calibrate", aliases=["cal", "refinedtarget", "caltarget"])
     async def refined_target(self, ctx: commands.Context[commands.Bot], symbol: str = None) -> None:
-        """Get refined price target with geopolitical adjustments. Usage: !calibrate LRCX"""
+        """Get refined price target. Usage: !calibrate or !calibrate LRCX"""
+        from .refined_targets import SEMI_EQUIPMENT
+        
+        # No symbol = scan all semi equipment
         if not symbol:
-            await ctx.send(
-                "**Usage:** `!calibrate SYMBOL`\n"
-                "Example: `!calibrate LRCX`\n\n"
-                "Or use `!calscan` to scan all semi equipment (LRCX, KLAC, ASML, AMAT)"
-            )
+            await ctx.send(f"🎯 Scanning {len(SEMI_EQUIPMENT)} semi equipment stocks...")
+            
+            try:
+                lines = [
+                    "🎯 **REFINED TARGET SCAN** (Semi Equipment)",
+                    "═" * 40,
+                    "",
+                ]
+                
+                for sym in SEMI_EQUIPMENT:
+                    target = calculate_refined_target(sym)
+                    
+                    if target.upside_percent > 15:
+                        emoji = "🟢"
+                    elif target.upside_percent > 5:
+                        emoji = "🟡"
+                    else:
+                        emoji = "🔴"
+                    
+                    flags = []
+                    if target.soxx_cap_applied:
+                        flags.append("CAPPED")
+                    if target.geopolitical_multiplier < 1.0:
+                        flags.append(f"GEO:{target.geopolitical_multiplier:.2f}x")
+                    if target.momentum_breakout:
+                        flags.append("RSI>70")
+                    
+                    flag_str = f" [{', '.join(flags)}]" if flags else ""
+                    
+                    lines.append(
+                        f"{emoji} **{sym}**: ${target.current_price:.2f} → ${target.final_target:.2f} "
+                        f"({target.upside_percent:+.1f}%){flag_str}"
+                    )
+                
+                lines.append("")
+                lines.append("Use `!calibrate SYMBOL` for full breakdown")
+                
+                await ctx.send("\n".join(lines))
+                
+            except Exception as e:
+                logger.error(f"Calibrate scan error: {e}")
+                await ctx.send(f"❌ Error: {str(e)[:200]}")
             return
         
+        # Specific symbol
         symbol = symbol.upper()
         await ctx.send(f"🎯 Calculating refined target for **{symbol}**...")
         
