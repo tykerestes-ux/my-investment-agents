@@ -125,7 +125,7 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
-    @commands.command(name="entry", aliases=["signal", "buy"])
+    @commands.command(name="entry", aliases=["signal", "entrysignal"])
     async def entry_signal(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
         """Check if now is a good time to enter. Usage: !entry KLAC"""
         symbol = symbol.upper()
@@ -297,9 +297,9 @@ class RiskCommands(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Error: {str(e)[:100]}")
 
-    @commands.command(name="backtest", aliases=["bt"])
-    async def run_backtest(self, ctx: commands.Context[commands.Bot], symbol: str, days: int = 90) -> None:
-        """Run backtest on historical data. Usage: !backtest KLAC 90"""
+    @commands.command(name="symbolbt", aliases=["sbt", "stockbt"])
+    async def symbol_backtest(self, ctx: commands.Context[commands.Bot], symbol: str, days: int = 90) -> None:
+        """Backtest a single symbol. Usage: !symbolbt KLAC 90"""
         symbol = symbol.upper()
         await ctx.send(f"📊 Running {days}-day backtest for **{symbol}**...")
         try:
@@ -1076,58 +1076,52 @@ class RiskCommands(commands.Cog):
 │ `!news SYMBOL`       │ News sentiment      │
 └─────────────────────────────────────────┘
 
-**🎯 ENTRY SIGNALS**
+**🎯 ENTRY & PREDICTIONS**
 ┌─────────────────────────────────────────┐
 │ `!entry SYMBOL`   │ Quick entry check     │
-│ `!scan`           │ Scan entire watchlist │
-│ `!position SYM $` │ Position sizing       │
+│ `!scan`           │ Scan watchlist        │
+│ `!predict SYMBOL` │ Verified prediction   │
+│ `!predictscan`    │ Verified scan all     │
+│ `!size SYM 10000` │ Position sizing       │
 └─────────────────────────────────────────┘
-
-**🔮 VERIFIED PREDICTIONS** (No Look-Ahead Bias)
-┌─────────────────────────────────────────┐
-│ `!predict SYMBOL` │ Full verified pred    │
-│ `!predictscan`    │ Scan watchlist        │
-└─────────────────────────────────────────┘
-*3-tier verification, 2x ATR cap, volume conviction*
 
 **🎯 REFINED TARGETS** (Semi Equipment)
 ┌─────────────────────────────────────────┐
 │ `!calibrate LRCX` │ Refined price target  │
 │ `!calscan`        │ Scan LRCX/KLAC/ASML   │
 └─────────────────────────────────────────┘
-*Geopolitical haircut, SOXX cap, margin override*
 
 **🔍 OPPORTUNITY SCANNER**
 ┌─────────────────────────────────────────┐
-│ `!opportunities`      │ Find buying opps  │
-│ `!opps`               │ Quick top 10      │
-│ `!opps tech`          │ Scan tech sector  │
-│ `!opps semis`         │ Scan semis only   │
-│ `!topopps`            │ STRONG_BUY only   │
+│ `!opportunities`  │ Full scan (120 stocks)│
+│ `!opps`           │ Quick top 10          │
+│ `!opps semis`     │ Semiconductors only   │
+│ `!topopps`        │ STRONG_BUY only       │
 └─────────────────────────────────────────┘
 
 **📊 BACKTESTING**
 ┌─────────────────────────────────────────┐
-│ `!backtest`           │ 30-day backtest   │
-│ `!backtest 60 75`     │ 60 days, score 75 │
-│ `!quickbt`            │ Quick 14-day test │
-│ `!btcompare`          │ Compare thresholds│
+│ `!backtest`       │ Full scanner backtest │
+│ `!backtest 60 75` │ 60 days, score >= 75  │
+│ `!symbolbt KLAC`  │ Single stock backtest │
+│ `!quickbt`        │ Quick 14-day summary  │
+│ `!btcompare`      │ Compare thresholds    │
 └─────────────────────────────────────────┘
 
 **📝 WATCHLIST**
 ┌─────────────────────────────────────────┐
-│ `!watchlist`          │ View watchlist    │
-│ `!permadd SYMBOL`     │ Add to watchlist  │
-│ `!permremove SYMBOL`  │ Remove from list  │
+│ `!watchlist`      │ View watchlist        │
+│ `!permadd SYMBOL` │ Add to watchlist      │
+│ `!permremove SYM` │ Remove from watchlist │
 └─────────────────────────────────────────┘
 
 **🧠 LEARNING SYSTEM**
 ┌─────────────────────────────────────────┐
-│ `!learn`       │ Generate improvements   │
-│ `!suggestions` │ View pending changes    │
-│ `!approveall`  │ Apply all changes       │
-│ `!journal`     │ View prediction stats   │
-│ `!params`      │ Current parameters      │
+│ `!learn`          │ Generate improvements │
+│ `!suggestions`    │ View pending changes  │
+│ `!approveall`     │ Apply all changes     │
+│ `!journal`        │ Prediction stats      │
+│ `!params`         │ Current parameters    │
 └─────────────────────────────────────────┘
 """
         await ctx.send(help_page1)
