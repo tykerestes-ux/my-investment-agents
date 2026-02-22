@@ -50,6 +50,19 @@ _margin_surprise_cache: dict[str, datetime] = {}
 
 
 @dataclass
+class CycleRiskSummary:
+    """Summary of cycle risk analysis."""
+    wfe_multiplier: float
+    inventory_multiplier: float
+    beta_multiplier: float
+    total_cycle_multiplier: float
+    risk_level: str
+    use_200dma_floor: bool
+    dma_200: float | None
+    warnings: list[str]
+
+
+@dataclass
 class RefinedTarget:
     """Refined price target with full methodology."""
     symbol: str
@@ -71,6 +84,9 @@ class RefinedTarget:
     soxx_cap_applied: bool
     soxx_growth_rate: float
     max_allowed_target: float  # Based on 1.5x SOXX cap
+    
+    # Cycle risk (NEW - bearish parameters)
+    cycle_risk: CycleRiskSummary | None
     
     # Final target
     final_target: float
@@ -370,12 +386,45 @@ def calculate_refined_target(symbol: str) -> RefinedTarget:
                 soxx_cap_applied = True
                 notes.append(f"Capped at 1.5x SOXX growth rate ({soxx_growth*100:.1f}% 6-mo)")
         
+        # === CYCLE RISK ANALYSIS (Bearish Parameters) ===
+        cycle_risk = None
+        if symbol in SEMI_EQUIPMENT:
+            try:
+                from .semi_cycle_risk import analyze_cycle_risk
+                cycle_result = analyze_cycle_risk(symbol, adjusted_target)
+                
+                cycle_risk = CycleRiskSummary(
+                    wfe_multiplier=cycle_result.wfe_analysis.multiplier,
+                    inventory_multiplier=cycle_result.inventory_analysis.multiplier,
+                    beta_multiplier=cycle_result.beta_analysis.multiplier,
+                    total_cycle_multiplier=cycle_result.total_multiplier,
+                    risk_level=cycle_result.risk_level,
+                    use_200dma_floor=cycle_result.beta_analysis.use_200dma_floor,
+                    dma_200=cycle_result.hard_floor_200dma,
+                    warnings=cycle_result.warnings,
+                )
+                
+                # Apply cycle risk to target
+                adjusted_target = cycle_result.final_target
+                
+                if cycle_result.total_multiplier < 1.0:
+                    notes.append(f"CYCLE RISK: {cycle_result.total_multiplier:.2f}x ({cycle_result.risk_level})")
+                
+                for warning in cycle_result.warnings:
+                    notes.append(f"⚠️ {warning}")
+                    
+            except Exception as e:
+                logger.debug(f"Cycle risk analysis unavailable: {e}")
+        
         # === FINAL TARGET ===
         final_target = adjusted_target
         upside_percent = ((final_target - current_price) / current_price) * 100
         
         # === CONFIDENCE ASSESSMENT ===
-        if analyst_count >= 10 and not soxx_cap_applied:
+        # Downgrade confidence if cycle risk is high
+        if cycle_risk and cycle_risk.risk_level in ["HIGH", "SEVERE"]:
+            confidence = "LOW"
+        elif analyst_count >= 10 and not soxx_cap_applied:
             confidence = "HIGH"
         elif analyst_count >= 5 or margin_surprise or eps_override:
             confidence = "MEDIUM"
@@ -396,6 +445,7 @@ def calculate_refined_target(symbol: str) -> RefinedTarget:
             soxx_cap_applied=soxx_cap_applied,
             soxx_growth_rate=soxx_growth,
             max_allowed_target=max_allowed_target,
+            cycle_risk=cycle_risk,
             final_target=final_target,
             upside_percent=upside_percent,
             momentum_breakout=momentum_breakout,
@@ -421,6 +471,7 @@ def calculate_refined_target(symbol: str) -> RefinedTarget:
             soxx_cap_applied=False,
             soxx_growth_rate=0,
             max_allowed_target=0,
+            cycle_risk=None,
             final_target=0,
             upside_percent=0,
             momentum_breakout=False,
@@ -482,6 +533,26 @@ def format_refined_target_discord(target: RefinedTarget) -> str:
         lines.append("└─ ✅ EPS Revision (>5%) - 2x cap allowed")
     else:
         lines.append("└─ ❌ EPS Revision")
+    
+    # Cycle Risk (Bearish Parameters)
+    if target.cycle_risk:
+        lines.append("")
+        risk_emoji = {"LOW": "🟢", "MODERATE": "🟡", "HIGH": "🟠", "SEVERE": "🔴"}.get(target.cycle_risk.risk_level, "⚪")
+        lines.append(f"**🐻 Cycle Risk Analysis:** {risk_emoji} {target.cycle_risk.risk_level}")
+        lines.append(f"├─ WFE Spending: {target.cycle_risk.wfe_multiplier:.2f}x")
+        lines.append(f"├─ Inventory Health: {target.cycle_risk.inventory_multiplier:.2f}x")
+        lines.append(f"├─ Beta/SOXX: {target.cycle_risk.beta_multiplier:.2f}x")
+        lines.append(f"├─ **Total Cycle Adj:** {target.cycle_risk.total_cycle_multiplier:.2f}x")
+        if target.cycle_risk.use_200dma_floor and target.cycle_risk.dma_200:
+            lines.append(f"└─ 📉 200 DMA Floor: ${target.cycle_risk.dma_200:.2f}")
+        else:
+            lines.append(f"└─ No hard floor active")
+        
+        if target.cycle_risk.warnings:
+            lines.append("")
+            lines.append("**⚠️ Cycle Warnings:**")
+            for w in target.cycle_risk.warnings[:3]:
+                lines.append(f"• {w}")
     
     # Methodology notes
     if target.methodology_notes:

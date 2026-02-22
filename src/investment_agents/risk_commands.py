@@ -8,7 +8,8 @@ from discord.ext import commands
 from .adaptive_params import get_param_manager, get_params
 from .alert_system import get_alert_manager, AlertType
 from .analyst_ratings import get_analyst_ratings, format_analyst_discord
-from .refined_targets import calculate_refined_target, format_refined_target_discord
+from .refined_targets import calculate_refined_target, format_refined_target_discord, SEMI_EQUIPMENT
+from .semi_cycle_risk import analyze_cycle_risk
 from .verified_prediction import generate_verified_prediction, format_prediction_discord, PredictionSignal
 from .backtester import backtest_signals, format_backtest_discord, format_backtest_summary
 from .opportunity_scanner import scan_for_opportunities, format_opportunities_discord, format_quick_opportunities, SCAN_UNIVERSE
@@ -1000,6 +1001,102 @@ class RiskCommands(commands.Cog):
             logger.error(f"Target scan error: {e}")
             await ctx.send(f"❌ Error: {str(e)[:200]}")
 
+    # === CYCLE RISK (Bearish Parameters) ===
+
+    @commands.command(name="cycle", aliases=["cyclerisk", "bearish"])
+    async def cycle_risk_cmd(self, ctx: commands.Context[commands.Bot], symbol: str = "") -> None:
+        """
+        Analyze semiconductor cycle risk (bearish parameters).
+        
+        Usage: !cycle LRCX or !cycle (scan all semis)
+        
+        Triggers:
+        1. WFE Spending Reversion (Macro) - 0.80x if <$120B
+        2. Inventory-to-Sales (Fundamental) - 0.85x if up >15% QoQ
+        3. SOXX Correlation Crash (Market) - 200 DMA floor if high-beta crash
+        """
+        from concurrent.futures import ThreadPoolExecutor
+        import asyncio
+        
+        def run_cycle_analysis(sym: str, base_target: float):
+            return analyze_cycle_risk(sym, base_target)
+        
+        if not symbol:
+            # Scan all semi equipment
+            await ctx.send(f"🐻 **Scanning cycle risk for {len(SEMI_EQUIPMENT)} semi equipment stocks...**")
+            
+            try:
+                lines = [
+                    "🐻 **SEMICONDUCTOR CYCLE RISK SCAN**",
+                    "═" * 40,
+                    "",
+                ]
+                
+                for sym in SEMI_EQUIPMENT:
+                    # Get current price as base target
+                    import yfinance as yf
+                    ticker = yf.Ticker(sym)
+                    info = ticker.info
+                    current_price = info.get("currentPrice") or info.get("regularMarketPrice", 100)
+                    target_mean = info.get("targetMeanPrice", current_price * 1.1)
+                    
+                    loop = asyncio.get_event_loop()
+                    with ThreadPoolExecutor() as executor:
+                        result = await loop.run_in_executor(
+                            executor, run_cycle_analysis, sym, target_mean
+                        )
+                    
+                    risk_emoji = {"LOW": "🟢", "MODERATE": "🟡", "HIGH": "🟠", "SEVERE": "🔴"}.get(result.risk_level, "⚪")
+                    
+                    # Show triggers
+                    triggers = []
+                    if result.wfe_analysis.is_bearish:
+                        triggers.append("WFE")
+                    if result.inventory_analysis.is_warning:
+                        triggers.append("INV")
+                    if result.beta_analysis.is_crash_mode:
+                        triggers.append("SOXX")
+                    
+                    trigger_str = f" [{', '.join(triggers)}]" if triggers else ""
+                    
+                    lines.append(
+                        f"{risk_emoji} **{sym}**: {result.total_multiplier:.2f}x{trigger_str} "
+                        f"(${current_price:.2f} → ${result.final_target:.2f})"
+                    )
+                
+                lines.append("")
+                lines.append("Use `!cycle SYMBOL` for full breakdown")
+                lines.append("**Triggers:** WFE=Macro, INV=Inventory, SOXX=Beta Crash")
+                
+                await ctx.send("\n".join(lines))
+                
+            except Exception as e:
+                logger.error(f"Cycle scan error: {e}")
+                await ctx.send(f"❌ Error: {str(e)[:200]}")
+        else:
+            # Single symbol analysis
+            symbol = symbol.upper()
+            await ctx.send(f"🐻 Analyzing cycle risk for **{symbol}**...")
+            
+            try:
+                import yfinance as yf
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+                current_price = info.get("currentPrice") or info.get("regularMarketPrice", 100)
+                target_mean = info.get("targetMeanPrice", current_price * 1.1)
+                
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor() as executor:
+                    result = await loop.run_in_executor(
+                        executor, run_cycle_analysis, symbol, target_mean
+                    )
+                
+                await ctx.send(result.format_discord())
+                
+            except Exception as e:
+                logger.error(f"Cycle risk error for {symbol}: {e}")
+                await ctx.send(f"❌ Error: {str(e)[:200]}")
+
     # === BACKTESTER ===
 
     @commands.command(name="backtest", aliases=["bt", "test"])
@@ -1138,6 +1235,13 @@ class RiskCommands(commands.Cog):
 ┌─────────────────────────────────────────┐
 │ `!calibrate LRCX` │ Refined price target  │
 │ `!calscan`        │ Scan LRCX/KLAC/ASML   │
+└─────────────────────────────────────────┘
+
+**🐻 CYCLE RISK** (Bearish Parameters)
+┌─────────────────────────────────────────┐
+│ `!cycle`          │ Scan all semi equip   │
+│ `!cycle LRCX`     │ Full cycle breakdown  │
+│ Triggers: WFE, Inventory, SOXX Beta     │
 └─────────────────────────────────────────┘
 
 **🔍 OPPORTUNITY SCANNER**
