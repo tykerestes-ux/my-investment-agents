@@ -8,6 +8,7 @@ from discord.ext import commands
 from .adaptive_params import get_param_manager, get_params
 from .alert_system import get_alert_manager, AlertType
 from .analyst_ratings import get_analyst_ratings, format_analyst_discord
+from .refined_targets import calculate_refined_target, format_refined_target_discord
 from .verified_prediction import generate_verified_prediction, format_prediction_discord, PredictionSignal
 from .backtester import backtest_signals, format_backtest_discord, format_backtest_summary
 from .opportunity_scanner import scan_for_opportunities, format_opportunities_discord, format_quick_opportunities, SCAN_UNIVERSE
@@ -884,6 +885,72 @@ class RiskCommands(commands.Cog):
             logger.error(f"Verified scan error: {e}")
             await ctx.send(f"❌ Error: {str(e)[:200]}")
 
+    # === REFINED TARGETS (Semi Equipment) ===
+
+    @commands.command(name="target", aliases=["pt", "pricetarget"])
+    async def refined_target(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
+        """Get refined price target with geopolitical adjustments. Usage: !target LRCX"""
+        symbol = symbol.upper()
+        await ctx.send(f"🎯 Calculating refined target for **{symbol}**...")
+        
+        try:
+            target = calculate_refined_target(symbol)
+            await ctx.send(format_refined_target_discord(target))
+            
+        except Exception as e:
+            logger.error(f"Refined target error for {symbol}: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
+    @commands.command(name="targetscan", aliases=["ptscan"])
+    async def target_scan(self, ctx: commands.Context[commands.Bot]) -> None:
+        """Scan semi equipment stocks for refined targets."""
+        from .refined_targets import SEMI_EQUIPMENT
+        
+        await ctx.send(f"🎯 Scanning {len(SEMI_EQUIPMENT)} semi equipment stocks...")
+        
+        try:
+            lines = [
+                "🎯 **REFINED TARGET SCAN** (Semi Equipment)",
+                "═" * 40,
+                "",
+            ]
+            
+            for symbol in SEMI_EQUIPMENT:
+                target = calculate_refined_target(symbol)
+                
+                # Determine emoji based on upside
+                if target.upside_percent > 15:
+                    emoji = "🟢"
+                elif target.upside_percent > 5:
+                    emoji = "🟡"
+                else:
+                    emoji = "🔴"
+                
+                # Flags
+                flags = []
+                if target.soxx_cap_applied:
+                    flags.append("CAPPED")
+                if target.geopolitical_multiplier < 1.0:
+                    flags.append(f"GEO:{target.geopolitical_multiplier:.2f}x")
+                if target.momentum_breakout:
+                    flags.append("MOMENTUM")
+                
+                flag_str = f" [{', '.join(flags)}]" if flags else ""
+                
+                lines.append(
+                    f"{emoji} **{symbol}**: ${target.current_price:.2f} → ${target.final_target:.2f} "
+                    f"({target.upside_percent:+.1f}%){flag_str}"
+                )
+            
+            lines.append("")
+            lines.append("Use `!target SYMBOL` for full breakdown")
+            
+            await ctx.send("\n".join(lines))
+            
+        except Exception as e:
+            logger.error(f"Target scan error: {e}")
+            await ctx.send(f"❌ Error: {str(e)[:200]}")
+
     # === BACKTESTER ===
 
     @commands.command(name="backtest", aliases=["bt", "test"])
@@ -1022,6 +1089,13 @@ class RiskCommands(commands.Cog):
 │ `!predictscan`    │ Scan watchlist        │
 └─────────────────────────────────────────┘
 *3-tier verification, 2x ATR cap, volume conviction*
+
+**🎯 REFINED TARGETS** (Semi Equipment)
+┌─────────────────────────────────────────┐
+│ `!target LRCX`    │ Refined price target  │
+│ `!targetscan`     │ Scan LRCX/KLAC/ASML   │
+└─────────────────────────────────────────┘
+*Geopolitical haircut, SOXX cap, margin override*
 
 **🔍 OPPORTUNITY SCANNER**
 ┌─────────────────────────────────────────┐
