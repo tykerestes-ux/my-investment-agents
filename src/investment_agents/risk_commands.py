@@ -888,8 +888,16 @@ class RiskCommands(commands.Cog):
     # === REFINED TARGETS (Semi Equipment) ===
 
     @commands.command(name="calibrate", aliases=["cal", "refinedtarget", "caltarget"])
-    async def refined_target(self, ctx: commands.Context[commands.Bot], symbol: str) -> None:
-        """Get refined price target with geopolitical adjustments. Usage: !target LRCX"""
+    async def refined_target(self, ctx: commands.Context[commands.Bot], symbol: str = None) -> None:
+        """Get refined price target with geopolitical adjustments. Usage: !calibrate LRCX"""
+        if not symbol:
+            await ctx.send(
+                "**Usage:** `!calibrate SYMBOL`\n"
+                "Example: `!calibrate LRCX`\n\n"
+                "Or use `!calscan` to scan all semi equipment (LRCX, KLAC, ASML, AMAT)"
+            )
+            return
+        
         symbol = symbol.upper()
         await ctx.send(f"🎯 Calculating refined target for **{symbol}**...")
         
