@@ -51,15 +51,57 @@ SECTOR_ETFS = {
 }
 
 # Sentiment keywords that override signals
+# GEOPOLITICAL CONTEXT: China export violations are HOT (AMAT $252M penalty Feb 2026)
+# Be AGGRESSIVE on flagging any China/export related news for semi equipment makers
+
 BEARISH_SENTIMENT_KEYWORDS = {
-    "ASML": ["euv", "lithography", "china export", "export restriction", "license"],
-    "NVDA": ["china ban", "export control", "h100", "a100", "chip ban"],
-    "AMD": ["china restriction", "export ban"],
-    "LRCX": ["china", "export", "restriction", "ban"],
-    "KLAC": ["china", "export", "restriction"],
-    # Generic for all semis
-    "_SEMIS": ["chip war", "semiconductor restriction", "export control"],
+    # Semi Equipment (HIGHEST RISK - direct China exposure, export license violations)
+    "AMAT": [
+        "china", "export", "penalty", "violation", "settlement", "fine", 
+        "restriction", "commerce department", "bis", "license", "sanction",
+        "compliance", "investigation", "doj", "justice department",
+    ],
+    "LRCX": [
+        "china", "export", "restriction", "ban", "penalty", "violation",
+        "commerce", "bis", "license", "sanction", "compliance", "huawei", "smic",
+    ],
+    "KLAC": [
+        "china", "export", "restriction", "ban", "penalty", "violation",
+        "commerce", "bis", "license", "sanction", "compliance",
+    ],
+    "ASML": [
+        "euv", "lithography", "china", "export", "restriction", "license",
+        "dutch", "netherlands", "duv", "immersion", "ban", "huawei", "smic",
+    ],
+    # Chip makers (also exposed)
+    "NVDA": [
+        "china", "ban", "export", "control", "h100", "a100", "h200", "b100",
+        "restriction", "gaming", "datacenter", "huawei",
+    ],
+    "AMD": [
+        "china", "restriction", "export", "ban", "mi300", "instinct",
+    ],
+    "INTC": [
+        "china", "export", "restriction", "fab", "foundry",
+    ],
+    "TSM": [
+        "china", "taiwan", "geopolitical", "invasion", "tension", "export",
+    ],
+    # Generic keywords for ALL semiconductor stocks
+    "_SEMIS": [
+        "chip war", "semiconductor restriction", "export control", 
+        "commerce department", "bureau of industry", "bis rule",
+        "entity list", "huawei", "smic", "china tension",
+        "tariff", "trade war", "decoupling",
+    ],
 }
+
+# High-severity keywords that should IMMEDIATELY downgrade to AVOID
+CRITICAL_BEARISH_KEYWORDS = [
+    "penalty", "fine", "violation", "settlement", "indictment",
+    "investigation", "doj", "sec investigation", "subpoena",
+    "export violation", "sanctions violation",
+]
 
 
 class PredictionSignal(Enum):
@@ -234,14 +276,28 @@ async def check_tier1_sector_momentum(symbol: str, stock_change: float) -> TierR
 async def check_tier2_sentiment(symbol: str) -> TierResult:
     """Tier 2: Check for bearish news that should override technicals.
     
-    Specifically: China export restrictions, EUV lithography for ASML, etc.
+    GEOPOLITICAL CONTEXT (Feb 2026):
+    - AMAT just paid $252M penalty for China export violations
+    - Semi equipment makers (AMAT, LRCX, KLAC, ASML) are HIGH RISK for export news
+    - Any China/export keywords should be treated aggressively
     """
     # Get keywords for this symbol
-    keywords = BEARISH_SENTIMENT_KEYWORDS.get(symbol, [])
+    keywords = list(BEARISH_SENTIMENT_KEYWORDS.get(symbol, []))
     
-    # Add generic semi keywords if it's a semi stock
-    if symbol in ["ASML", "LRCX", "KLAC", "NVDA", "AMD", "INTC", "AVGO", "TSM", "AMAT"]:
+    # Semi equipment makers get EXTRA scrutiny
+    SEMI_EQUIPMENT = ["ASML", "LRCX", "KLAC", "AMAT", "TSM"]
+    SEMI_CHIPS = ["NVDA", "AMD", "INTC", "AVGO", "QCOM", "MU", "MRVL"]
+    
+    if symbol in SEMI_EQUIPMENT:
+        # These are highest risk - add all generic semi keywords
         keywords.extend(BEARISH_SENTIMENT_KEYWORDS.get("_SEMIS", []))
+        # Extra sensitivity for equipment makers
+        keywords.extend(["china", "export", "commerce", "regulation"])
+    elif symbol in SEMI_CHIPS:
+        keywords.extend(BEARISH_SENTIMENT_KEYWORDS.get("_SEMIS", []))
+    
+    # Remove duplicates
+    keywords = list(set(keywords))
     
     if not keywords:
         return TierResult(
@@ -259,23 +315,61 @@ async def check_tier2_sentiment(symbol: str) -> TierResult:
         
         # Check recent news for keywords
         bearish_headlines = []
-        for article in news[:10]:  # Last 10 articles
-            title = article.get("title", "").lower()
-            for keyword in keywords:
-                if keyword.lower() in title:
-                    bearish_headlines.append(article.get("title", "Unknown"))
-                    break
+        critical_headlines = []  # Severe news (penalties, violations, investigations)
         
-        if bearish_headlines:
+        for article in news[:15]:  # Check more articles for semi equipment
+            title = article.get("title", "").lower()
+            matched_keyword = None
+            
+            # First check for critical keywords (penalties, violations)
+            for critical_kw in CRITICAL_BEARISH_KEYWORDS:
+                if critical_kw in title:
+                    critical_headlines.append(article.get("title", "Unknown"))
+                    matched_keyword = critical_kw
+                    break
+            
+            # Then check for regular bearish keywords
+            if not matched_keyword:
+                for keyword in keywords:
+                    if keyword.lower() in title:
+                        bearish_headlines.append(article.get("title", "Unknown"))
+                        matched_keyword = keyword
+                        break
+        
+        # CRITICAL headlines = immediate AVOID signal
+        if critical_headlines:
             return TierResult(
                 tier=2,
                 name="Sentiment Filter",
                 passed=False,
-                adjustment=-20,
-                reason=f"Bearish news detected: {bearish_headlines[0][:50]}...",
-                flags=["BEARISH_NEWS", "SENTIMENT_OVERRIDE"],
+                adjustment=-40,  # Severe penalty
+                reason=f"⚠️ CRITICAL: {critical_headlines[0][:60]}...",
+                flags=[
+                    "CRITICAL_NEWS", 
+                    "IMMEDIATE_AVOID",
+                    f"Found {len(critical_headlines)} critical headline(s)",
+                ],
             )
         
+        # Regular bearish headlines
+        if bearish_headlines:
+            # More severe penalty for semi equipment makers
+            adjustment = -30 if symbol in SEMI_EQUIPMENT else -20
+            
+            return TierResult(
+                tier=2,
+                name="Sentiment Filter",
+                passed=False,
+                adjustment=adjustment,
+                reason=f"Bearish news: {bearish_headlines[0][:50]}...",
+                flags=[
+                    "BEARISH_NEWS", 
+                    "GEOPOLITICAL_RISK" if symbol in SEMI_EQUIPMENT else "SENTIMENT_OVERRIDE",
+                    f"Found {len(bearish_headlines)} concerning headline(s)",
+                ],
+            )
+        
+        # No bearish news found
         return TierResult(
             tier=2,
             name="Sentiment Filter",
@@ -287,6 +381,16 @@ async def check_tier2_sentiment(symbol: str) -> TierResult:
         
     except Exception as e:
         logger.debug(f"Error checking sentiment: {e}")
+        # For semi equipment, default to cautious if we can't check
+        if symbol in SEMI_EQUIPMENT:
+            return TierResult(
+                tier=2,
+                name="Sentiment Filter",
+                passed=True,
+                adjustment=-5,  # Small penalty for uncertainty
+                reason="⚠️ News check failed - proceed with caution (high-risk sector)",
+                flags=["NEWS_CHECK_FAILED", "SEMI_EQUIPMENT_CAUTION"],
+            )
         return TierResult(
             tier=2,
             name="Sentiment Filter",
